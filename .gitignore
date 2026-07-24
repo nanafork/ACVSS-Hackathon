@@ -1,0 +1,18 @@
+# macOS metadata
+__MACOSX/
+.DS_Store
+._*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+env/
