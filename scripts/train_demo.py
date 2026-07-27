@@ -26,6 +26,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--brats", action="store_true")
     ap.add_argument("--root", default="")
+    ap.add_argument("--cached", default="", help="path to an .npz of real slices "
+                    "from scripts/prepare_msd.py (trains on the case-level "
+                    "train split, never on the held-out cases)")
     ap.add_argument("--size", type=int, default=96)
     ap.add_argument("--factor", type=int, default=4)
     ap.add_argument("--sigma", type=float, default=0.03)
@@ -39,12 +42,18 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(0)
 
-    if args.brats:
+    if args.cached:
+        train_ds = make_dataset("cached", path=args.cached, split="train")
+        kind = "cached"
+        print(f"real data: {len(train_ds)} slices from {train_ds.n_cases()} cases")
+    elif args.brats:
         train_ds = make_dataset("brats", root=args.root, modality="t1c",
                                 size=args.size, slices_per_case=12, min_tumor_pixels=20)
+        kind = "brats"
     else:
         train_ds = make_dataset("synthetic", n=args.n, size=args.size, seed=1)
-    print(f"device={device} train={len(train_ds)} size={args.size}")
+        kind = "synthetic"
+    print(f"device={device} train={len(train_ds)} size={args.size} kind={kind}")
 
     seg = seg_unet(base=32)
     train_segmenter(seg, train_ds, epochs=args.seg_epochs, bs=8, device=device)
@@ -61,7 +70,7 @@ def main():
 
     save_models(args.out, seg, sr_d, sr_t,
                 meta={"size": args.size, "factor": args.factor, "sigma": args.sigma,
-                      "kind": "brats" if args.brats else "synthetic"})
+                      "kind": kind, "source": args.cached or args.root or "procedural"})
     print("saved", args.out)
 
 
