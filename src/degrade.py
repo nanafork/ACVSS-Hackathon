@@ -6,8 +6,10 @@ Emulates a low-field MRI acquisition from a high-resolution scan by:
   2. Realistic noise via the Rician model, the distribution that MRI
      magnitude images follow at low SNR.
 
-Everything here is numpy so it has no torch/GPU dependency and is easy to
-reason about and test. Inputs/outputs are float images scaled to [0, 1].
+The reference implementation is numpy: no torch/GPU dependency, easy to reason
+about and test. Inputs/outputs are float images scaled to [0, 1]. A batched
+torch port (``degrade_torch``) lives at the bottom for training, where running
+the forward model on-device avoids a per-sample CPU round trip.
 
 Scope note: this captures the resolution and noise characteristics of a
 low-field scan. It does NOT reproduce field-strength contrast changes, so it
@@ -100,3 +102,55 @@ def degrade(
     if clip:
         out = np.clip(out, 0.0, 1.0)
     return out.astype(np.float32)
+
+
+# --------------------------------------------------------------------------- #
+# Torch port: same forward model, batched and on-device.
+#
+# The numpy path above is the readable reference and is what evaluation uses
+# (seeded, deterministic, one slice at a time). Training is different: it
+# degrades every batch of every epoch, so doing it in numpy means a
+# GPU -> CPU -> FFT -> GPU round trip per sample per step, and the GPU idles
+# through it. These functions do the identical arithmetic in torch so the data
+# never leaves the device. test_degrade_parity.py checks the two agree.
+# --------------------------------------------------------------------------- #
+def kspace_truncate_torch(img: "torch.Tensor", factor: int) -> "torch.Tensor":
+    """Batched k-space truncation. ``img`` is (B, 1, H, W) real."""
+    import torch
+    h, w = img.shape[-2:]
+    k = torch.fft.fftshift(torch.fft.fft2(img), dim=(-2, -1))
+    mask = torch.zeros((h, w), dtype=img.dtype, device=img.device)
+    ch, cw = h // 2, w // 2
+    kh, kw = max(1, h // (2 * factor)), max(1, w // (2 * factor))
+    mask[ch - kh:ch + kh, cw - kw:cw + kw] = 1.0
+    return torch.fft.ifft2(torch.fft.ifftshift(k * mask, dim=(-2, -1))).abs()
+
+
+def add_rician_noise_torch(img: "torch.Tensor", sigma: float,
+                           generator=None) -> "torch.Tensor":
+    """Batched Rician noise: sqrt((img + n_real)^2 + n_imag^2)."""
+    import torch
+    kw = dict(dtype=img.dtype, device=img.device, generator=generator)
+    n_real = torch.randn(img.shape, **kw) * sigma
+    n_imag = torch.randn(img.shape, **kw) * sigma
+    return torch.sqrt((img + n_real) ** 2 + n_imag ** 2)
+
+
+def degrade_torch(img: "torch.Tensor", factor: int = 4, sigma: float = 0.02,
+                  generator=None, clip: bool = True) -> "torch.Tensor":
+    """Full forward model on a (B, 1, H, W) batch, staying on ``img``'s device.
+
+    Args:
+        img: (B, 1, H, W) float tensor in [0, 1].
+        factor, sigma, clip: as in ``degrade``.
+        generator: optional torch.Generator on the same device, for
+            reproducible noise.
+    """
+    out = img
+    if factor and factor > 1:
+        out = kspace_truncate_torch(out, factor)
+    if sigma and sigma > 0:
+        out = add_rician_noise_torch(out, sigma, generator)
+    if clip:
+        out = out.clamp(0.0, 1.0)
+    return out

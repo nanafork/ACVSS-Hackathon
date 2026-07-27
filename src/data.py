@@ -101,16 +101,41 @@ class SyntheticSliceDataset(Dataset):
 
 
 class BraTSSliceDataset(Dataset):
-    """2D axial slices from BraTS .nii.gz volumes.
+    """2D axial slices from BraTS .nii.gz volumes, pre-extracted into memory.
 
     Expects the standard BraTS layout, one folder per case containing files
     that end with the modality tag, e.g. ``*_t1c.nii.gz`` (2023+) or
     ``*_t1ce.nii.gz`` (<=2021) and a ``*_seg.nii.gz`` label volume.
 
-    We take a single modality (default the contrast-enhanced T1) and the middle
-    axial slices, where the anatomy and tumor are clearest. Tumor labels are
-    binarized (any positive label -> tumor); the WT/TC/ET split lives in
-    metrics.py for evaluation.
+    We take a single modality (default the contrast-enhanced T1) and a handful
+    of axial slices per case. Tumor labels are binarized (any positive label
+    -> tumor).
+
+    Why slices are pre-extracted: a BraTS volume decompresses to ~70 MB, and
+    .nii.gz is gzip, so pulling one 2D slice costs a full sequential decode of
+    the volume. Reading per ``__getitem__`` would re-decode every volume once
+    per slice per epoch, which dominates training time by orders of magnitude.
+    Instead every volume is decoded exactly once here, the wanted slices are
+    cropped to (size, size) and kept as arrays. A 128px, 12-slices-per-case,
+    300-case set is ~240 MB, which fits comfortably in RAM.
+
+    Args:
+        root: directory containing one folder per case.
+        modality: which MRI contrast to read (see MOD_TAGS).
+        size: output side length; slices are center-cropped/padded to it.
+        slices_per_case: how many axial slices to keep per case.
+        min_tumor_pixels: drop slices with fewer tumor pixels than this.
+        max_cases: only read the first N case folders (for quick runs).
+        select: 'middle' takes the central slices; 'tumor' takes the slices
+            with the largest tumor area, which is usually what a lesion study
+            wants.
+        normalize: 'slice' scales each slice to [0,1] independently (the
+            historical behaviour); 'volume' scales each case by its own
+            volume-wide statistics, which keeps intensities comparable across
+            slices of the same scan.
+        cache_path: optional .npz path. Written after the first build and
+            reused on later runs, so a Colab session that disconnects does not
+            pay the extraction cost twice.
     """
 
     MOD_TAGS = {
@@ -121,30 +146,98 @@ class BraTSSliceDataset(Dataset):
     }
 
     def __init__(self, root: str, modality: str = "t1c", size: int = 128,
-                 slices_per_case: int = 12, min_tumor_pixels: int = 0):
+                 slices_per_case: int = 12, min_tumor_pixels: int = 0,
+                 max_cases: int | None = None, select: str = "middle",
+                 normalize: str = "slice", cache_path: str | None = None,
+                 log=print):
         self.root = root
         self.size = size
         self.tags = self.MOD_TAGS[modality]
-        self.index: list[tuple[str, str, int]] = []  # (img_path, seg_path, z)
+
+        if cache_path and os.path.exists(cache_path):
+            self._load_cache(cache_path, log)
+            return
 
         case_dirs = sorted(
             d for d in glob.glob(os.path.join(root, "*")) if os.path.isdir(d)
         )
-        for d in case_dirs:
+        if max_cases is not None:
+            case_dirs = case_dirs[:max_cases]
+        if not case_dirs:
+            raise RuntimeError(f"No case folders found under {root!r}")
+
+        import nibabel as nib  # lazy: only needed for real data
+
+        images: list[np.ndarray] = []
+        masks: list[np.ndarray] = []
+        case_ids: list[int] = []
+        skipped = 0
+
+        for ci, d in enumerate(case_dirs):
             img_path = self._find(d, self.tags)
             seg_path = self._find(d, ["seg"])
             if img_path is None or seg_path is None:
+                skipped += 1
                 continue
-            z0, z1 = self._middle_slice_range(seg_path, slices_per_case)
-            import nibabel as nib  # lazy: only needed for real data
-            seg = nib.load(seg_path).get_fdata()
-            for z in range(z0, z1):
-                if min_tumor_pixels and (seg[:, :, z] > 0).sum() < min_tumor_pixels:
-                    continue
-                self.index.append((img_path, seg_path, z))
-        if not self.index:
-            raise RuntimeError(f"No BraTS slices found under {root!r}")
 
+            # One decode per volume, float32 rather than get_fdata()'s float64.
+            vol = np.asanyarray(nib.load(img_path).dataobj, dtype=np.float32)
+            seg = np.asanyarray(nib.load(seg_path).dataobj) > 0
+            if vol.ndim != 3 or seg.shape != vol.shape:
+                skipped += 1
+                continue
+            if normalize == "volume":
+                vol = _norm01(vol)
+
+            for z in self._pick_slices(seg, slices_per_case, select):
+                m2 = seg[:, :, z].astype(np.float32)
+                if min_tumor_pixels and m2.sum() < min_tumor_pixels:
+                    continue
+                img2 = vol[:, :, z]
+                if normalize == "slice":
+                    img2 = _norm01(img2)
+                images.append(center_crop(img2.astype(np.float32), size))
+                masks.append(center_crop(m2, size).astype(np.uint8))
+                case_ids.append(ci)
+
+            if log and (ci + 1) % 25 == 0:
+                log(f"  read {ci + 1}/{len(case_dirs)} cases -> {len(images)} slices")
+
+        if not images:
+            raise RuntimeError(
+                f"No BraTS slices found under {root!r} "
+                f"({skipped} case folders skipped; check the modality tag and layout)")
+
+        self.images = np.stack(images)                       # (N, size, size) f32
+        self.masks = np.stack(masks)                         # (N, size, size) u8
+        self.case_ids = np.asarray(case_ids, dtype=np.int32)  # (N,)
+        if log:
+            mb = (self.images.nbytes + self.masks.nbytes) / 1024 ** 2
+            log(f"BraTS: {len(self)} slices from {len(set(case_ids))} cases "
+                f"({mb:.0f} MB in memory)"
+                + (f", {skipped} folders skipped" if skipped else ""))
+        if cache_path:
+            self._save_cache(cache_path, log)
+
+    # ---------------------------------------------------------------- caching
+    def _save_cache(self, path: str, log=print) -> None:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        np.savez_compressed(path, images=self.images, masks=self.masks,
+                            case_ids=self.case_ids, size=np.int32(self.size))
+        if log:
+            log(f"cached dataset -> {path}")
+
+    def _load_cache(self, path: str, log=print) -> None:
+        z = np.load(path)
+        self.images = z["images"]
+        self.masks = z["masks"]
+        self.case_ids = z["case_ids"]
+        self.size = int(z["size"])
+        if log:
+            log(f"loaded cached dataset from {path}: {len(self)} slices "
+                f"from {len(set(self.case_ids.tolist()))} cases")
+
+    # ------------------------------------------------------------- extraction
     @staticmethod
     def _find(case_dir: str, tags: list[str]) -> str | None:
         for tag in tags:
@@ -154,26 +247,43 @@ class BraTSSliceDataset(Dataset):
         return None
 
     @staticmethod
-    def _middle_slice_range(seg_path: str, k: int) -> tuple[int, int]:
-        import nibabel as nib
-        depth = nib.load(seg_path).shape[2]
-        mid = depth // 2
-        half = k // 2
-        return max(0, mid - half), min(depth, mid + half)
+    def _pick_slices(seg: np.ndarray, k: int, select: str) -> list[int]:
+        """Choose which axial slice indices to keep from one case."""
+        depth = seg.shape[2]
+        if select == "tumor":
+            areas = seg.reshape(-1, depth).sum(axis=0)
+            order = np.argsort(-areas, kind="stable")
+            picked = [int(z) for z in order[:k] if areas[z] > 0]
+            return sorted(picked) if picked else []
+        if select != "middle":
+            raise ValueError(f"unknown slice selection {select!r}")
+        mid, half = depth // 2, k // 2
+        return list(range(max(0, mid - half), min(depth, mid + half)))
 
+    # ---------------------------------------------------------------- Dataset
     def __len__(self) -> int:
-        return len(self.index)
+        return len(self.images)
 
     def __getitem__(self, idx: int):
-        import nibabel as nib
-        img_path, seg_path, z = self.index[idx]
-        img = nib.load(img_path).get_fdata()[:, :, z]
-        seg = nib.load(seg_path).get_fdata()[:, :, z]
-        img = center_crop(_norm01(np.asarray(img)), self.size)
-        mask = center_crop((np.asarray(seg) > 0).astype(np.float32), self.size)
-        hr = torch.from_numpy(img.astype(np.float32))[None]
-        m = torch.from_numpy(mask.astype(np.float32))[None]
+        hr = torch.from_numpy(self.images[idx])[None]
+        m = torch.from_numpy(self.masks[idx].astype(np.float32))[None]
         return {"hr": hr, "mask": m}
+
+    def split_by_case(self, val_frac: float = 0.2, seed: int = 0):
+        """Split into (train_idx, val_idx) with no case appearing in both.
+
+        Splitting by slice index would put adjacent slices of the same scan on
+        both sides, which leaks anatomy and flatters the test numbers. Held-out
+        cases are the honest comparison.
+        """
+        cases = np.unique(self.case_ids)
+        rng = np.random.default_rng(seed)
+        rng.shuffle(cases)
+        n_val = max(1, int(round(len(cases) * val_frac)))
+        val_cases = set(cases[:n_val].tolist())
+        val_idx = [i for i, c in enumerate(self.case_ids.tolist()) if c in val_cases]
+        train_idx = [i for i, c in enumerate(self.case_ids.tolist()) if c not in val_cases]
+        return train_idx, val_idx
 
 
 def make_dataset(kind: str = "synthetic", **kwargs) -> Dataset:
