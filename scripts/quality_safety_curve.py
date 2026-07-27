@@ -34,13 +34,13 @@ DI_COLOR = "#B4553B"                  # distortion-optimal (RISE low)
 TA_COLOR = "#2E7D5B"                  # tumor-aware (RISE good)
 
 
-def _load():
+def _load(device="cpu"):
     from src.checkpoint import load_models
     if not os.path.exists(CKPT):
         from demo import _ensure_models
-        seg, sr_d, sr_t, size, factor, sigma = _ensure_models("cpu")
+        seg, sr_d, sr_t, size, factor, sigma = _ensure_models(device)
         return seg, sr_d, sr_t, size, sigma
-    seg, sr_d, sr_t, meta = load_models(CKPT, device="cpu")
+    seg, sr_d, sr_t, meta = load_models(CKPT, device=device)
     return seg, sr_d, sr_t, int(meta.get("size", 96)), float(meta.get("sigma", 0.03))
 
 
@@ -71,7 +71,7 @@ def build(out="quality_safety_curve.png", device="cpu"):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    seg, sr_d, sr_t, size, sigma = _load()
+    seg, sr_d, sr_t, size, sigma = _load(device)
     ds = make_dataset("synthetic", n=40, size=size, seed=999, tumor_frac=1.0)
 
     curves = {"distortion": [], "tumor-aware": []}

@@ -44,7 +44,7 @@ def ssim(pred: torch.Tensor, target: torch.Tensor, data_range: float = 1.0,
     """Structural similarity (mean over the image). Expects (B,1,H,W) or (1,H,W)."""
     if pred.dim() == 3:
         pred, target = pred[None], target[None]
-    w = _gaussian_window(win).to(pred.dtype)
+    w = _gaussian_window(win).to(device=pred.device, dtype=pred.dtype)
     pad = win // 2
     mu_x = F.conv2d(pred, w, padding=pad)
     mu_y = F.conv2d(target, w, padding=pad)
