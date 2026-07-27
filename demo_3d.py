@@ -126,48 +126,50 @@ PAGE = """<!doctype html>
     <div class="tag rise" style="--i:0">ACVSS &middot; MRI Super-Resolution Safety</div>
     <h1 class="rise" style="--i:1">When sharper means <em>blind</em>.</h1>
     <p class="lede rise" style="--i:2">Super-resolution makes a cheap low-field brain scan look crisp.
-    When it is trained only for image quality, it can quietly <b>erase the tumor</b>.
-    The panels below show our own pipeline output, rebuilt in 3D with the
-    <b>neuro-voxel</b> volume renderer. The brain and the segmenter stay fixed.
-    Only the super-resolution objective changes.</p>
+    When it is trained only for image quality, it can quietly <b>erase a small tumor</b>.
+    We measure how often that happens and fix it with a tumor-aware objective.
+    The 3D views below illustrate the mechanism on a synthetic brain, rendered with
+    the <b>neuro-voxel</b> analyzer. The measured result is the erasure rate and the
+    quality-safety curve.</p>
    </div>
   </header>
 
   <div class="wrap">
 
-  <section class="vitals rise" style="--i:3; margin-top:-2.6rem" aria-label="tumor volume readout">
-    <div class="vital true"><div class="k"><span class="dot" style="background:var(--accent)"></span>Ground truth</div>
-      <div class="v">{true_v}<span class="u">cm&sup3;</span></div>
-      <div class="d">the tumor actually present</div></div>
-    <div class="vital safe"><div class="k"><span class="dot" style="background:var(--good)"></span>Tumor-aware SR</div>
-      <div class="v">{ta_v}<span class="u">cm&sup3;</span></div>
-      <div class="d" style="color:var(--good)">{ta_pct}% preserved &middot; lesion kept</div></div>
+  <section class="vitals rise" style="--i:3; margin-top:-2.6rem" aria-label="measured safety result">
     <div class="vital erased"><div class="k"><span class="dot" style="background:var(--low)"></span>Distortion-optimal SR</div>
-      <div class="v">{di_v}<span class="u">cm&sup3;</span></div>
-      <div class="d" style="color:var(--low)">{di_pct}% preserved &middot; lesion erased</div></div>
+      <div class="v">27.8<span class="u">%</span></div>
+      <div class="d">tumor erasure rate (held-out)</div></div>
+    <div class="vital safe"><div class="k"><span class="dot" style="background:var(--good)"></span>Tumor-aware SR</div>
+      <div class="v">15.2<span class="u">%</span></div>
+      <div class="d" style="color:var(--good)">erasure roughly halved</div></div>
+    <div class="vital"><div class="k"><span class="dot" style="background:var(--warn)"></span>The tradeoff</div>
+      <div class="v" style="color:var(--warn)">0.62</div>
+      <div class="d">tumor-aware false-positive rate, up from 0.34</div></div>
   </section>
 
-  <p class="note rise" style="--i:4">Ground truth is the true high-resolution scan (true HR).
-  We degrade it to imitate a cheap low-field scanner, then measure how much tumor each
-  model recovers from that degraded input.</p>
+  <p class="note rise" style="--i:4">The 3D scenes below are a synthetic illustration of the
+  mechanism. True HR is the original high-resolution scan; we degrade it to imitate a cheap
+  low-field scanner. The cm&sup3; volume in a render is not the safety metric. The measured
+  result is the erasure rate above and the quality-safety curve in the write-up.</p>
 
   <section class="panels rise" style="--i:4">
     <figure><img src="data:image/png;base64,{img_true}" alt="ground truth tumor in 3D">
-      <figcaption><b>Ground truth.</b> Four lesions, {true_v} cm&sup3;.</figcaption></figure>
+      <figcaption><b>Ground truth.</b> The true lesions.</figcaption></figure>
     <figure><img src="data:image/png;base64,{img_ta}" alt="tumor-aware reconstruction in 3D">
-      <figcaption><b>Tumor-aware SR.</b> The lesion survives at {ta_v} cm&sup3;.</figcaption></figure>
+      <figcaption><b>Tumor-aware reconstruction.</b> Illustration.</figcaption></figure>
     <figure><img src="data:image/png;base64,{img_di}" alt="distortion reconstruction in 3D">
-      <figcaption><b>Distortion-optimal SR.</b> The lesion is gone at {di_v} cm&sup3;.</figcaption></figure>
+      <figcaption><b>Distortion-optimal reconstruction.</b> Illustration.</figcaption></figure>
   </section>
 
   <section class="rotate rise" style="--i:5">
     <div class="view"><img src="data:image/gif;base64,{img_gif}" alt="rotating 3D brain with tumor overlays"></div>
     <div>
-      <h2>One brain, three verdicts.</h2>
-      <p style="color:var(--ink-mid)">The orbit overlays all three results. It shows the
-      true tumor shell, the volume the tumor-aware model keeps, and the empty space the
-      distortion model leaves. At matched image quality, <b>image quality is not a safety
-      metric</b>.</p>
+      <h2>One brain, three reconstructions.</h2>
+      <p style="color:var(--ink-mid)">The orbit overlays the three reconstructions on one brain,
+      so you can see where each objective keeps or loses tumor tissue. This view is a
+      qualitative illustration. The quantitative result is that at matched image quality
+      <b>image quality is not a safety metric</b>: the tumor-aware model erases fewer lesions.</p>
       <div class="legend">
         <span><span class="dot" style="background:var(--accent)"></span>true</span>
         <span><span class="dot" style="background:var(--good)"></span>tumor-aware</span>

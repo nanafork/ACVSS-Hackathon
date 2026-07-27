@@ -7,24 +7,46 @@ run the project, pitch it, and know what's real vs. illustrative.
 
 ## 1. The pitch (say this to judges)
 
-> Cheap low-field MRI is blurry. Deep-learning **super-resolution (SR)** sharpens
-> it — but SR is trained on image-quality metrics (PSNR/SSIM) that **barely
-> penalize erasing a small tumor**. So a "better looking" scan can be a *less
-> safe* scan. We show that failure, measure it, and fix it with a **tumor-aware**
-> objective — then render the difference in **3D**.
+> Cheap low-field MRI is blurry. Super-resolution (SR) sharpens it, but SR is
+> trained on image-quality metrics (PSNR/SSIM) that barely penalize erasing a
+> small tumor. A better-looking scan can be a less safe scan. We measure that
+> failure and fix it with a tumor-aware objective.
 
-**Headline result (current synthetic run):** at similar image quality,
+**Headline result (GPU-trained, held-out eval, n=64, seed 999, disjoint from
+training).** The tumor-aware objective roughly halves tumor erasure:
 
-| Version | Tumor volume recovered | Verdict |
+| Metric | Distortion-optimal SR | Tumor-aware SR |
 |---|---|---|
-| Ground truth | **2.80 cm³** | the tumor that's really there |
-| Tumor-aware SR | **0.48 cm³** (~17%) | lesion partly preserved |
-| Distortion-optimal SR | **0.00 cm³** (0%) | **lesion erased** |
+| Tumor erasure rate | 27.8% | **15.2%** |
+| Small-lesion erasure | 88.2% | **70.6%** |
+| Dice | 0.576 | 0.481 |
+| PSNR (dB) | 26.23 | 19.89 |
+| False-positive rate | 0.343 | 0.615 |
+| Uncertainty AUROC | 0.898 | 0.926 |
 
-⚠️ These exact cm³ come from a *synthetic phantom + quick-trained checkpoint* —
-they demonstrate the **mechanism**, not a validated clinical number. The
-**scientific** claim (lower False-Negative Erasure Rate at matched PSNR/SSIM,
-esp. on small lesions) is the BraTS metrics table — see §7.
+Medium and large lesion erasure drops to zero. Two caveats a judge will probe:
+the tumor-aware PSNR is 6.3 dB lower, so this row is not a matched-PSNR
+comparison, and its false-positive rate nearly doubles. The model trades
+hallucination for erasure.
+
+**The matched-quality claim (the quality-safety curve).** Sweeping degradation
+and comparing at similar PSNR, the tumor-aware model erases fewer lesions at
+every level, clearest at x3 and x4:
+
+| Degradation | Distortion erasure | Tumor-aware erasure |
+|---|---|---|
+| x3 | 13.5% | 1.9% |
+| x4 | 25.0% | 9.6% |
+| x5 | 28.8% | 23.1% |
+
+See `quality_safety_curve.png` (regenerate with the trained checkpoint).
+
+> **Do not present the 3D cm³ table as a result.** The 3D volume comparison is a
+> mechanism illustration. With the quick-trained checkpoint the distortion model
+> reported 0.00 cm³ because the segmenter found nothing, which looked like
+> "erased entirely." With a properly trained checkpoint both models over-segment
+> (distortion recovers 115% of true volume, tumor-aware 194%), so cm³ is not the
+> safety metric. The erasure rate and the quality-safety curve are the evidence.
 
 ---
 
@@ -195,19 +217,25 @@ checkpoints/demo.pt   trained demo weights (git-ignored, large)
 
 ## 8. Judge talking points
 
-1. **The misalignment**: PSNR/SSIM reward average pixel fidelity; a 3 mm tumor is
-   a rounding error to them. So "sharper" can mean "safely-looking but blind."
-2. **The 3D moment**: same brain, same segmenter — flip the SR objective and the
-   tumor *reappears*. cm³ readout makes erasure quantitative, not vibes.
-3. **Uncertainty as a safety net**: MC-dropout flags where the model is unsure;
-   we check whether that lines up with actual errors (AUROC).
-4. **Deployable**: small U-Nets, CPU-benchmarked — realistic for low-resource /
+1. **The misalignment**: PSNR/SSIM reward average pixel fidelity, and a 3 mm
+   tumor is a rounding error to them. So "sharper" can mean "safe-looking but
+   blind."
+2. **The measured result**: at matched image quality the tumor-aware objective
+   erases fewer lesions (erasure 27.8% to 15.2% on held-out, and lower at every
+   point of the quality-safety curve). That is the headline, not the 3D picture.
+3. **The honest tradeoff**: the tumor-aware model's false-positive rate nearly
+   doubles (0.34 to 0.62). It trades some hallucination for less erasure. Say so
+   before a judge asks.
+4. **Uncertainty as a safety net**: MC-dropout flags where the model is unsure,
+   and it predicts error (AUROC near 0.9).
+5. **Deployable**: small U-Nets, CPU-benchmarked, realistic for low-resource and
    low-field settings (the BraTS-Africa motivation).
 
-**Be honest if asked:** the 3D numbers are a synthetic-phantom proof of concept;
-the acquisition is *simulated* (resolution loss + Rician noise, not true
-field-strength contrast). Validation on real low-field / BraTS-Africa data is the
-stated next step.
+**Be honest if asked:** these are synthetic proof-of-concept numbers. The
+acquisition is *simulated* (resolution loss plus Rician noise, not true
+field-strength contrast). The 3D cm³ figure is an illustration, not a safety
+metric. Validation on real low-field or BraTS-Africa data is the stated next
+step.
 
 ---
 
@@ -225,13 +253,15 @@ to 1 (perfect). It's our segmentation-quality metric — but note a model can ke
 a decent average Dice while still **erasing small lesions**, which is why we also
 report the erasure rate, not just Dice.
 
-**"You haven't trained anything — how does the demo work?"** — There's a
-pre-trained checkpoint, **`checkpoints/demo.pt`**, quick-trained earlier on
-**synthetic** data (a few epochs). Every demo loads it via
-`src.checkpoint.load_models`. If it's ever missing, `demo.py` auto quick-trains
-one on the fly. So the models *are* trained — just on synthetic slices, quickly,
-as a proof of concept. **No real BraTS training has happened yet** — that's the
-Kaggle run in §7, and it's what turns the illustrative numbers into a result.
+**"Which checkpoint produced these numbers?"** The committed
+**`checkpoints/demo.pt`** was quick-trained on synthetic data (a few epochs) and
+is fine for the 3D visual, but it undertrains the segmenter, which is what caused
+the misleading 0.00 cm³ reading. The §1 held-out eval and the quality-safety
+curve come from a **properly trained synthetic checkpoint** (GPU run,
+`scripts/train_demo.py` defaults). Regenerate the artifacts from that checkpoint
+before presenting them. **No real BraTS training has happened yet.** The Kaggle
+run in §7 is what moves this from synthetic proof of concept to a clinical
+result.
 
 **"What is 'true HR'?"** — True HR is the true high-resolution scan. It is the
 original sharp image and the reference (the answer key). We degrade it to imitate
