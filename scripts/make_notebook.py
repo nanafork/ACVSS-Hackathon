@@ -11,13 +11,30 @@ Pipeline: **degrade** a high-res brain scan (k-space truncation + Rician noise) 
 **safety rates** (lesion erasure, hallucination), plus **MC-dropout uncertainty**
 and a **CPU benchmark**.
 
-**How to run on Kaggle**
-1. Add this repository to the notebook (upload as a Dataset, or `git clone`) so
-   that the `src/` package is importable.
-2. Attach a BraTS dataset (e.g. the BraTS2020 subset on Kaggle, no registration).
-3. Set `DATA_ROOT` and `DATA_KIND = "brats"` below. Leave `"synthetic"` to run
+**How to run on Kaggle with a GPU**
+1. New Notebook, then in the right-hand panel set **Accelerator = GPU T4 x2**
+   and **Internet = On**. (GPU requires a phone-verified Kaggle account.)
+2. Run the clone cell below. It pulls the current branch, so you get the same
+   code as the local demo.
+3. **+ Add Input** and search `brats20-dataset-training-validation`, then add
+   it. That mirror needs no registration.
+4. Set `DATA_KIND = "brats"` in the config cell. Leave `"synthetic"` to run
    with no download.
-4. Run all. Turn on the GPU accelerator for faster training."""),
+5. Run All. On a T4 the synthetic run is a few minutes; BraTS is longer.
+
+The last cell saves `checkpoints/demo.pt`. Download it from the notebook's
+Output tab and drop it into `checkpoints/` locally, then `python main_demo.py`
+regenerates the deck from the GPU-trained weights."""),
+
+    ("code", """# Clone the repo so the src/ package is importable. Skip if you added it as
+# a Kaggle Dataset instead. Private repo: use a token, or upload as a Dataset.
+REPO = "https://github.com/nanafork/ACVSS-Hackathon.git"
+BRANCH = "neuro-voxel-3d-viz"
+import os
+if not os.path.isdir("/kaggle/working/ACVSS-Hackathon") and os.path.isdir("/kaggle"):
+    !git clone --depth 1 --branch $BRANCH $REPO /kaggle/working/ACVSS-Hackathon
+    %cd /kaggle/working/ACVSS-Hackathon
+!pip -q install nibabel"""),
 
     ("code", """import sys, os
 # Make the src/ package importable whether the repo is the working dir or added
