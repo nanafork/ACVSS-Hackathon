@@ -120,6 +120,17 @@ python scripts/train_demo.py --brats --root PATH  # real BraTS
 **Correctness check (CI-style):** `python smoke_test.py` runs the whole
 pipeline end-to-end on synthetic data and prints the metric table.
 
+**Quality-safety curve:** `python scripts/quality_safety_curve.py` writes
+`quality_safety_curve.png`. It sweeps degradation severity and plots tumor
+erasure rate against image quality (PSNR) for both models. The tumor-aware curve
+stays below the distortion curve, which means fewer erased lesions at the same
+image quality.
+
+**Weights on Hugging Face:** the notebook has a final section that prompts for a
+Hugging Face token (write access) and uploads the trained checkpoint to
+`<username>/tumor-aware-sr-weights`. The teammate running the notebook pastes
+their own token; nothing is stored in the repo.
+
 ---
 
 ## 5. Repo map
