@@ -19,7 +19,7 @@ from src.checkpoint import save_models
 from src.data import make_dataset
 from src.losses import make_sr_loss
 from src.models import seg_unet, sr_unet
-from src.train import train_segmenter, train_sr
+from src.train import set_deterministic, train_segmenter, train_sr
 
 
 def main():
@@ -30,14 +30,15 @@ def main():
     ap.add_argument("--factor", type=int, default=4)
     ap.add_argument("--sigma", type=float, default=0.03)
     ap.add_argument("--n", type=int, default=240)
-    ap.add_argument("--seg-epochs", type=int, default=10)
+    ap.add_argument("--seg-epochs", type=int, default=30)
     ap.add_argument("--sr-epochs", type=int, default=18)
     ap.add_argument("--weight", type=float, default=40.0)
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="checkpoints/demo.pt")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    torch.manual_seed(0)
+    set_deterministic(args.seed)
 
     if args.brats:
         train_ds = make_dataset("brats", root=args.root, modality="t1c",
