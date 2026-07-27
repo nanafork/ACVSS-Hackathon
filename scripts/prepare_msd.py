@@ -47,7 +47,20 @@ def main():
     ap.add_argument("--slices-per-case", type=int, default=12)
     ap.add_argument("--min-tumor-pixels", type=int, default=20)
     ap.add_argument("--max-cases", type=int, default=0, help="0 = all")
+    ap.add_argument("--region", default="wt", choices=["wt", "tc", "et"],
+                    help="which nested region becomes the binary mask: whole "
+                         "tumor (any label), tumor core (non-enhancing + "
+                         "enhancing), or enhancing tumor only. The paper's "
+                         "claim is about the small enhancing lesion, so 'et' "
+                         "is the region that actually tests it.")
     args = ap.parse_args()
+
+    def to_mask(seg_slice):
+        if args.region == "wt":
+            return (seg_slice > 0).astype(np.float32)
+        if args.region == "tc":
+            return np.isin(seg_slice, (2, 3)).astype(np.float32)
+        return (seg_slice == 3).astype(np.float32)
 
     import nibabel as nib
 
@@ -75,7 +88,7 @@ def main():
             mid, half = depth // 2, args.slices_per_case // 2
             z0, z1 = max(0, mid - half), min(depth, mid + half)
             for z in range(z0, z1):
-                m = (seg[:, :, z] > 0).astype(np.float32)
+                m = to_mask(seg[:, :, z])
                 if m.sum() < args.min_tumor_pixels:
                     continue
                 # dataobj slicing avoids decoding the whole 4-D volume.
