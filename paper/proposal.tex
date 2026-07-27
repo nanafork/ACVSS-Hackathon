@@ -58,10 +58,42 @@ Portable low-field MRI could widen access to brain imaging where scanners are sc
 \vspace{0.3em}
 {\headfont\normalsize\bfseries\color{ink} Contributions}
 \begin{itemize}
+  \item We define a physics-informed forward model that converts a high-resolution scan into a simulated low-field one by discarding the outer frequency-domain (k-space) detail and adding Rician noise. The degradation runs on the fly, so every low-resolution input keeps an exact high-resolution reference and no paired low-field or African dataset is required. Resolution loss and noise are reproduced; field-strength contrast change is not, which bounds the claims to simulated degradation.
   \item We show that distortion-optimal super-resolution is unsafe for pathology: at matched image quality it suppresses small lesions, so PSNR and SSIM are inadequate targets for safety-critical enhancement.
   \item We propose a tumor-aware (lesion-weighted) super-resolution objective and isolate its effect by comparing it against a distortion-optimal baseline at matched PSNR and SSIM.
   \item We quantify two safety rates for the super-resolution-then-segmentation pipeline, a False Negative Erasure Rate and a False Positive Detection Rate, both stratified by lesion size.
   \item We pair the model with Monte Carlo dropout uncertainty, test whether it predicts erasure, and verify CPU-only deployability.
+\end{itemize}
+
+\thinrule
+
+\section*{Definitions}
+
+\newcommand{\dt}[1]{\textbf{#1}}
+\begin{itemize}\small
+  \item \dt{MRI (magnetic resonance imaging):} imaging of soft tissue using magnetic fields, with no ionizing radiation.
+  \item \dt{Field strength (tesla, T):} the strength of the scanner's static magnetic field. Higher field yields more signal and finer detail.
+  \item \dt{Low-field MRI:} scanners below roughly 0.5~T. They cost less and can be moved, and they produce noisier, lower-resolution images. Clinical high-field systems run at 1.5~T to 3~T.
+  \item \dt{k-space:} the frequency-domain representation of an MR image. The center carries low frequencies (coarse structure) and the edges carry high frequencies (fine detail). A scanner samples k-space and the image is its inverse Fourier transform.
+  \item \dt{Rician noise:} the distribution that MRI magnitude images follow. It arises when independent Gaussian noise on the real and imaginary channels is converted to a magnitude, and it departs from Gaussian behavior at low signal-to-noise ratio (Gudbjartsson and Patz, 1995).
+  \item \dt{Out-of-distribution:} an input unlike the data a model was trained on. Low-field scans are out-of-distribution for models trained on high-field scans.
+  \item \dt{BraTS (Brain Tumor Segmentation challenge):} a public multi-modal brain MRI dataset with expert tumor masks (Menze et al., 2015). Its three nested regions are Whole Tumor (all abnormal tissue including edema), Tumor Core (enhancing plus necrotic core), and Enhancing Tumor (the active enhancing part, which is small or absent in low-grade cases).
+  \item \dt{Super-resolution (SR):} recovering a higher-resolution image from a low-resolution one.
+  \item \dt{Forward model (degradation):} the operator that maps a high-resolution scan to a simulated low-field one. Ours truncates k-space and then adds Rician noise.
+  \item \dt{Truncation factor:} how severely k-space is cropped. Factor~4 keeps the central quarter of each frequency axis and discards the rest.
+  \item \dt{U-Net:} a convolutional encoder-decoder network with skip connections joining matching levels (Ronneberger et al., 2015).
+  \item \dt{Residual prediction:} the network outputs a correction that is added to its input rather than outputting the image directly.
+  \item \dt{Distortion-optimal:} trained only to minimize pixel error. This is our baseline objective.
+  \item \dt{Tumor-aware (lesion-weighted):} pixel error inside the tumor mask is multiplied by a factor, so an error on the lesion costs more than the same error in healthy tissue.
+  \item \dt{Monte Carlo dropout:} keeping dropout active at inference and averaging several stochastic passes. The spread across passes approximates predictive uncertainty (Gal and Ghahramani, 2016).
+  \item \dt{PSNR (peak signal-to-noise ratio, dB):} pixel fidelity against the reference image. Higher is better.
+  \item \dt{SSIM (structural similarity):} perceptual similarity against the reference, in $[0,1]$. Higher is better.
+  \item \dt{Dice:} overlap between a predicted mask and the true mask, in $[0,1]$. Higher is better.
+  \item \dt{Pseudo-normalization:} enhancement that makes an abnormal scan look normal by smoothing pathology away.
+  \item \dt{False Negative Erasure Rate (FNER):} the fraction of real lesions the pipeline no longer detects after enhancement.
+  \item \dt{False Positive Detection Rate (FPDR):} the rate at which tumor-like structure is detected where none exists (hallucination).
+  \item \dt{Matched quality:} comparing the two objectives at equal PSNR and SSIM, so that any difference in safety is attributable to the objective and not to sharpness.
+  \item \dt{AUROC (area under the receiver operating characteristic curve):} used here to test whether the uncertainty map ranks erroneous pixels above correct ones. A value of 0.5 is chance.
 \end{itemize}
 
 \thinrule
@@ -79,6 +111,26 @@ Super-resolution is known to improve downstream tumor segmentation (\href{https:
 \textbf{Two super-resolution models.} We train two small U-Nets with dropout: a \textit{quality-optimal} baseline with a standard pixel loss, and a \textit{tumor-aware} variant whose loss up-weights the tumor region (optionally with a segmentation-consistency term). Keeping dropout active at inference and running several passes (Monte Carlo dropout) yields a spatial uncertainty map.
 
 \textbf{Downstream segmentation.} We segment the tumor with a compact 2D U-Net we train on BraTS. Training our own 2D model avoids the dimensionality and four-modality mismatch of large pretrained 3D models. Segmentation is reported on the three standard nested regions: Whole Tumor (all abnormal tissue including edema), Tumor Core (enhancing plus necrotic core), and Enhancing Tumor (the active enhancing part, small or absent in low-grade cases).
+
+\textbf{Model per stage.} Every network is trained from scratch. No pretrained weights are used, and one shared U-Net implementation serves both tasks so that the objective is the only variable under test.
+
+\begin{center}\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{5.4cm}>{\raggedright\arraybackslash}p{7.0cm}@{}}
+\toprule
+\textbf{Stage} & \textbf{Model} & \textbf{Configuration and objective} \\
+\midrule
+1. Degradation & None (deterministic operator) & k-space truncation at factor~4 followed by Rician noise at $\sigma = 0.03$. Applied on the fly, so no degraded copies are stored. \\
+2. Baseline & The degraded input itself, and bicubic upsampling & Reference point for confirming that super-resolution helps segmentation at all. \\
+3a. Super-resolution (distortion-optimal) & 2D U-Net, 4 levels, base width 32, dropout 0.2, residual output, 1.93M parameters & Pixel L1 loss. Adam, learning rate $10^{-3}$. \\
+3b. Super-resolution (tumor-aware) & Same architecture and parameter count as 3a & Lesion-weighted L1 with weight 20 to 40, plus an optional segmentation-consistency term against the frozen segmenter. \\
+4. Downstream segmentation & 2D U-Net, base width 32, no dropout, no residual, one logit channel, 1.93M parameters & Binary cross-entropy on clean high-resolution slices, then frozen so it cannot adapt to either super-resolution model. \\
+5. Uncertainty & Reuse of 3a or 3b & Dropout left active at inference over 10 Monte Carlo passes. The per-pixel standard deviation across passes is the uncertainty map. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The segmenter is deliberately frozen before either super-resolution model is trained. It is the measuring instrument for both safety rates, so allowing it to keep learning would let it compensate for a lesion that a super-resolution model had erased.
 
 \section*{Contribution and evaluation}
 

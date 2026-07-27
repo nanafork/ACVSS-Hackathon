@@ -72,6 +72,7 @@ We treat the training objective as the problem rather than the architecture. We 
 
 \paragraph{Contributions.}
 \begin{itemize}
+  \item We define a physics-informed forward model that emulates low-field acquisition from a high-resolution scan through k-space truncation and Rician noise. The degradation is applied on the fly during training and evaluation, so every low-resolution input retains an exact high-resolution reference and the study requires no paired low-field acquisitions. The model reproduces resolution loss and noise but not field-strength contrast change, which confines the claims below to simulated degradation.
   \item We show that distortion-optimal \SR is unsafe for pathology. At matched image quality it suppresses small lesions more often than a tumor-aware model, which means PSNR and SSIM are inadequate targets for safety-critical enhancement.
   \item We propose a tumor-aware (lesion-weighted) \SR objective and isolate its effect against a distortion-optimal baseline at matched PSNR and SSIM.
   \item We quantify two safety rates for the SR-then-segmentation pipeline, a \FNER (pseudo-normalization) and a False Positive Detection Rate (hallucination), both stratified by lesion size, and we report the tradeoff between them.
