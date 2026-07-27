@@ -112,7 +112,7 @@ def degrade(
 # degrades every batch of every epoch, so doing it in numpy means a
 # GPU -> CPU -> FFT -> GPU round trip per sample per step, and the GPU idles
 # through it. These functions do the identical arithmetic in torch so the data
-# never leaves the device. test_degrade_parity.py checks the two agree.
+# never leaves the device. tests/test_pipeline.py checks the two agree.
 # --------------------------------------------------------------------------- #
 def kspace_truncate_torch(img: "torch.Tensor", factor: int) -> "torch.Tensor":
     """Batched k-space truncation. ``img`` is (B, 1, H, W) real."""

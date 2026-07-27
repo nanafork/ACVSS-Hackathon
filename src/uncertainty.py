@@ -23,6 +23,11 @@ from .models import enable_mc_dropout
 def mc_predict(model: torch.nn.Module, x: torch.Tensor, passes: int = 10):
     """Monte Carlo dropout inference.
 
+    The model's per-module training flags are saved on entry and restored on
+    exit. Without that, enabling MC dropout here would leave Dropout layers
+    stochastic for the caller, so any later "deterministic" forward pass on the
+    same model would silently be sampling instead.
+
     Args:
         model: SR network (must contain Dropout layers).
         x: (B, 1, H, W) input.
@@ -31,9 +36,14 @@ def mc_predict(model: torch.nn.Module, x: torch.Tensor, passes: int = 10):
         mean: (B, 1, H, W) mean prediction.
         unc:  (B, 1, H, W) per-pixel std across passes (the uncertainty map).
     """
-    enable_mc_dropout(model)
-    outs = torch.stack([model(x) for _ in range(passes)], dim=0)
-    return outs.mean(0), outs.std(0)
+    was_training = {m: m.training for m in model.modules()}
+    try:
+        enable_mc_dropout(model)
+        outs = torch.stack([model(x) for _ in range(passes)], dim=0)
+        return outs.mean(0), outs.std(0)
+    finally:
+        for m, flag in was_training.items():
+            m.training = flag
 
 
 def uncertainty_error_auroc(unc: np.ndarray, error: np.ndarray) -> float:
@@ -49,10 +59,7 @@ def uncertainty_error_auroc(unc: np.ndarray, error: np.ndarray) -> float:
     n_neg = int((~y).sum())
     if n_pos == 0 or n_neg == 0:
         return float("nan")
-    order = np.argsort(u, kind="mergesort")
-    ranks = np.empty_like(order, dtype=np.float64)
-    ranks[order] = np.arange(1, len(u) + 1)
-    # Average ranks for ties.
+    # Rank every pixel, averaging ranks within groups of tied uncertainties.
     _, inv, counts = np.unique(u, return_inverse=True, return_counts=True)
     cum = np.cumsum(counts)
     start = cum - counts

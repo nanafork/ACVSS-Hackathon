@@ -16,3 +16,7 @@ __pycache__/
 venv/
 .venv/
 env/
+
+# Cached BraTS slice stacks (regenerate from the source volumes)
+cache/
+*.npz
