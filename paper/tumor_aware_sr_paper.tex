@@ -1,0 +1,203 @@
+\documentclass[11pt,a4paper]{article}
+
+% Overleaf-safe: compiles with the default pdfLaTeX, no system fonts or custom
+% class files. Preamble mirrors the group's proposal document for consistency.
+\usepackage[margin=2.3cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{XCharter}
+\usepackage{tgadventor}
+\usepackage[scaled=0.85]{beramono}
+\newcommand{\headfont}{\sffamily}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage[colorlinks=true,linkcolor=ink,citecolor=ink,urlcolor=linkc]{hyperref}
+
+\definecolor{ink}{HTML}{1A1A1A}
+\definecolor{mid}{HTML}{444444}
+\definecolor{muted}{HTML}{666666}
+\definecolor{rule}{HTML}{CCCCCC}
+\definecolor{linkc}{HTML}{2B5FA8}
+\color{ink}
+
+\titleformat{\section}{\headfont\large\bfseries\color{ink}}{\thesection}{0.8em}{}
+\titlespacing{\section}{0pt}{0.9em}{0.3em}
+\titleformat{\subsection}{\headfont\normalsize\bfseries\color{mid}}{\thesubsection}{0.6em}{}
+\titlespacing{\subsection}{0pt}{0.6em}{0.2em}
+
+\newcommand{\thinrule}{\noindent\textcolor{rule}{\rule{\linewidth}{0.6pt}}}
+\setlist[itemize]{leftmargin=1.3em, itemsep=1pt, topsep=2pt, label=\textcolor{muted}{\textbullet}}
+\setlength{\emergencystretch}{5em}
+
+% Convenience macros
+\newcommand{\FNER}{False Negative Erasure Rate\xspace}
+\usepackage{xspace}
+\newcommand{\SR}{super-resolution\xspace}
+
+\begin{document}
+
+{\headfont\LARGE\bfseries Tumor-Aware MRI Super-Resolution: a Safety Study}
+
+\vspace{0.15em}
+{\headfont\normalsize\color{mid} Why image-quality metrics are the wrong target for safe enhancement of low-field brain MRI}
+
+\vspace{0.25em}
+{\color{muted}\small Victor Oyindouye Miene \quad Nthabiseng Thema \quad Adiza Alhassan \quad\textperiodcentered\quad ACVSS Hackathon}
+
+\vspace{0.4em}
+\thinrule
+
+\begin{abstract}
+\noindent
+Portable low-field magnetic resonance imaging (MRI) could widen access to brain imaging where scanners are scarce, but its scans are noisy and low-resolution. Deep learning super-resolution (SR) sharpens these scans, and it is usually trained and judged by image-quality scores such as Peak Signal-to-Noise Ratio (PSNR) and Structural Similarity (SSIM). A small tumor occupies a tiny fraction of the image, so these scores barely change when a model smooths a lesion away (erasure) or invents one that is not present (hallucination). We test whether the standard training objective is itself misaligned with clinical safety. We simulate low-field acquisition by truncating k-space and adding Rician noise, and we train two small U-Nets with identical architecture and data: a distortion-optimal baseline and a tumor-aware variant whose loss up-weights the lesion region. Using a downstream tumor segmenter, we measure how often each model erases a real tumor or fabricates a false one, stratified by lesion size, and we add a Monte Carlo dropout uncertainty map. On a held-out synthetic set the tumor-aware objective roughly halves tumor erasure (27.8\% to 15.2\%), and a quality-safety sweep shows lower erasure at matched image quality across every degradation level tested. The tumor-aware model does not come free: its false-positive rate nearly doubles (0.34 to 0.62), so it trades hallucination for erasure. We present this as a proof of concept on simulated degradation. Validation on real low-field or BraTS-Africa data is future work.
+\end{abstract}
+
+\vspace{0.3em}
+\thinrule
+
+\section{Introduction}
+
+MRI is scarce across much of sub-Saharan Africa, where there is less than one scanner per million people against up to 37 per million in high-income countries~\cite{anazodo2024}. Portable low-field scanners are cheaper and easier to deploy, which makes them a realistic route to access. Their images are lower in resolution and noisier than high-field scans, and they look different from the high-field data that most analysis models are trained on, so automated analysis degrades. Deep learning \SR bridges part of this gap. A recent study enhanced 0.055T brain MRI using models trained on high-field scans with the low-field characteristics simulated~\cite{man2023}, and the accompanying commentary warns that such enhancement can hallucinate structure or erase abnormalities and needs validation~\cite{johnson2023}.
+
+The failure has a clear cause. \SR is optimized for pixel fidelity, and distortion and perceptual quality are formally at odds~\cite{blau2018}. Because a small enhancing tumor is a tiny fraction of the image, erasing it barely moves PSNR or SSIM. A model can therefore score well on image quality while removing exactly the finding a clinician needs. This erasure and hallucination behavior is documented for deep medical image reconstruction and translation~\cite{antun2020,cohen2018,bhadra2021}.
+
+\paragraph{Our approach.}
+We treat the training objective as the problem rather than the architecture. We generate low-resolution and high-resolution pairs by degrading good scans, so the original image is always the answer key. We train two small U-Nets with identical capacity and data. The first uses a standard pixel loss (distortion-optimal). The second up-weights the tumor region (tumor-aware). We then hold image quality equal between the two models and measure what happens to the tumor through a downstream segmenter, so any difference in safety is attributable to the objective rather than to how sharp the images look. We report a Monte Carlo (MC) dropout uncertainty map and a CPU-latency measurement for deployability.
+
+\paragraph{Contributions.}
+\begin{itemize}
+  \item We show that distortion-optimal \SR is unsafe for pathology. At matched image quality it suppresses small lesions more often than a tumor-aware model, which means PSNR and SSIM are inadequate targets for safety-critical enhancement.
+  \item We propose a tumor-aware (lesion-weighted) \SR objective and isolate its effect against a distortion-optimal baseline at matched PSNR and SSIM.
+  \item We quantify two safety rates for the SR-then-segmentation pipeline, a \FNER (pseudo-normalization) and a False Positive Detection Rate (hallucination), both stratified by lesion size, and we report the tradeoff between them.
+  \item We pair the model with MC dropout uncertainty, test whether it predicts error, and verify CPU-only inference.
+\end{itemize}
+
+\section{Related work}
+
+\paragraph{The perception-distortion tradeoff.}
+Blau and Michaeli~\cite{blau2018} prove that distortion metrics such as PSNR and SSIM are formally at odds with perceptual quality. Our result is a safety-specific consequence of this tradeoff: optimizing distortion does not protect a small structure whose contribution to the metric is negligible.
+
+\paragraph{Hallucination and erasure in medical imaging.}
+Antun et al.~\cite{antun2020} show that deep reconstruction can fail to recover a small structure such as a tumor. Cohen et al.~\cite{cohen2018} and Bhadra et al.~\cite{bhadra2021} document fabricated features in medical image translation and tomographic reconstruction. These works establish that both erasure and hallucination occur. We add the observation that the standard training target is what drives the erasure, and we measure the effect directly.
+
+\paragraph{Super-resolution and uncertainty.}
+\SR is known to improve downstream tumor segmentation~\cite{zhou2022}. MC dropout provides a Bayesian approximation of predictive uncertainty~\cite{gal2016} and has been applied to safer neuroimage enhancement~\cite{tanno2021}. We use it as a complementary safety signal and test whether high uncertainty coincides with residual error.
+
+\section{Method}
+
+\subsection{Physics-informed degradation}
+We build training pairs by degrading high-resolution scans, so the original image is the ground truth. Two steps approximate a low-field acquisition rather than a plain blur. First, we impose resolution loss by cropping the center of k-space (the frequency-domain image), which keeps the low-frequency block and discards the high-frequency edges before inverting. Second, we add Rician noise (the noise model that MRI magnitude images follow~\cite{gudbjartsson1995}). A truncation factor sets the severity of the resolution loss.
+
+\subsection{Two super-resolution models}
+We train two small U-Nets~\cite{ronneberger2015} with dropout. The distortion-optimal baseline uses a standard pixel loss. The tumor-aware variant uses the same architecture and data but adds a term that up-weights the tumor region, so reconstruction error inside the lesion is penalized more heavily. Keeping dropout active at inference and running several forward passes (MC dropout) yields a spatial uncertainty map~\cite{gal2016}.
+
+\subsection{Downstream segmentation and safety metrics}
+We segment the tumor with a compact 2D U-Net trained on BraTS~\cite{menze2015}. A 2D model avoids the dimensionality and four-modality mismatch of large pretrained 3D models. We evaluate safety through this segmenter, stratified by lesion size:
+\begin{itemize}
+  \item \textbf{\FNER (pseudo-normalization):} the fraction of real lesions, especially small enhancing regions, that are blurred away and missed by the segmenter.
+  \item \textbf{False Positive Detection Rate (hallucination):} the rate at which tumor-like structure is fabricated outside the true mask.
+\end{itemize}
+Because the two SR models can be reconstructed at different image quality, we also sweep the degradation severity and compare erasure at matched quality, which isolates the effect of the objective from the effect of sharpness.
+
+\section{Results}
+
+We trained both SR U-Nets and the segmentation U-Net on simulated low-field data and evaluated on a held-out synthetic set (n~$=$~64, seed~999, disjoint from the training seed). These numbers are a proof of concept on simulated degradation and are not a clinical result.
+
+\paragraph{Safety on the held-out set.}
+Table~\ref{tab:main} reports the comparison. The tumor-aware objective roughly halves tumor erasure (27.8\% to 15.2\%) and reduces small-lesion erasure from 88.2\% to 70.6\%. Erasure of medium and large lesions drops to zero for the tumor-aware model. Two facts must be stated plainly. This raw row is not a matched-quality comparison, because the tumor-aware PSNR is 6.3~dB lower; the matched-quality claim is the sweep in Table~\ref{tab:curve}. The tumor-aware false-positive rate nearly doubles (0.343 to 0.615), so the model trades some hallucination for less erasure. A clinician should weigh that tradeoff.
+
+\begin{table}[h]
+  \caption{Held-out evaluation (n~$=$~64). PSNR and SSIM are image quality; the remaining rows are safety. Lower erasure and lower false-positive rate are safer.}
+  \label{tab:main}
+  \centering
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+    \textbf{Metric} & \textbf{Distortion-optimal} & \textbf{Tumor-aware} \\
+    \midrule
+    PSNR (dB)                 & 26.23 & 19.89 \\
+    SSIM                      & 0.751 & 0.739 \\
+    Dice                      & 0.576 & 0.481 \\
+    Tumor erasure rate        & 27.8\% & \textbf{15.2\%} \\
+    Small-lesion erasure rate & 88.2\% & \textbf{70.6\%} \\
+    False positive rate       & 0.343 & 0.615 \\
+    Uncertainty AUROC         & 0.898 & 0.926 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Quality-safety curve.}
+Table~\ref{tab:curve} sweeps the degradation factor and compares erasure at similar image quality. The tumor-aware model erases fewer lesions at every level tested, and the gap is largest at moderate degradation. This supports the central claim: at matched image quality the standard objective erases small tumors that the tumor-aware objective preserves, so image quality is the wrong target for safe enhancement.
+
+\begin{table}[h]
+  \caption{Quality-safety sweep. Tumor erasure rate at matched degradation severity. The tumor-aware model is lower at every level.}
+  \label{tab:curve}
+  \centering
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+    \textbf{Degradation factor} & \textbf{Distortion erasure} & \textbf{Tumor-aware erasure} \\
+    \midrule
+    $\times 3$ & 13.5\% & \textbf{1.9\%} \\
+    $\times 4$ & 25.0\% & \textbf{9.6\%} \\
+    $\times 5$ & 28.8\% & \textbf{23.1\%} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% TODO: add Figure with quality_safety_curve.png once regenerated from the trained checkpoint.
+% \begin{figure}[h]\centering\includegraphics[width=\linewidth]{quality_safety_curve.png}
+% \caption{Tumor erasure rate versus image quality (PSNR). The tumor-aware curve sits below the distortion curve.}\label{fig:curve}\end{figure}
+
+\paragraph{Uncertainty.}
+The MC dropout uncertainty map is predictive of error, with an Area Under the Receiver Operating Characteristic (AUROC) near 0.9 for both models (0.898 and 0.926). High uncertainty coincides with residual error, which makes the map a useful complementary flag for a reviewing clinician. Inference runs on CPU, which supports deployment in low-resource settings.
+
+\section{Discussion and limitations}
+
+The tumor-aware objective reduces erasure but increases hallucination. Neither error is free in a clinical setting. A screening tool that must not miss cancer may accept more false alarms, while a workflow already strained by false positives may not. The right operating point is a clinical decision, and the value of this study is that it makes both error rates visible and adjustable rather than hidden inside an image-quality score.
+
+Several limitations bound the claims. The acquisition is simulated through resolution loss and Rician noise, so it does not reproduce the field-strength contrast changes of a real low-field scanner. The evaluation set is synthetic, which controls lesion size but is not real anatomy. The raw held-out comparison in Table~\ref{tab:main} is not matched on PSNR, which is why the matched-quality claim rests on the sweep in Table~\ref{tab:curve}. We also provide a 3D rendering of the reconstructions for qualitative inspection, but we do not report tumor volume in cubic centimeters as a result, because that measurement is sensitive to segmenter calibration and is an illustration rather than a safety metric. Validation on real low-field data or on BraTS-Africa is the necessary next step.
+
+\section{Conclusion}
+
+We tested whether the standard \SR objective is misaligned with clinical safety, and we found that it is. At matched image quality, a distortion-optimal model erases small tumors that a tumor-aware model preserves, which shows that PSNR and SSIM are the wrong targets for safety-critical enhancement. A lesion-weighted objective roughly halves erasure on a held-out synthetic set, at the cost of a higher false-positive rate. We report both rates honestly, pair the model with an uncertainty map that predicts error, and confirm CPU inference. The finding is a corrective one about the objective rather than a new architecture, and it motivates validation on real low-field and BraTS-Africa data.
+
+\thinrule
+
+\begin{thebibliography}{99}\small
+
+\bibitem{blau2018} A.~Blau and T.~Michaeli. The Perception-Distortion Tradeoff. \textit{CVPR}, 2018. \href{https://arxiv.org/abs/1711.06077}{arXiv:1711.06077}.
+
+\bibitem{antun2020} V.~Antun et al. On instabilities of deep learning in image reconstruction. \textit{PNAS} 117(48):30088--30095, 2020. \href{https://doi.org/10.1073/pnas.1907377117}{DOI}.
+
+\bibitem{cohen2018} J.~Cohen et al. Distribution Matching Losses Can Hallucinate Features in Medical Image Translation. \textit{MICCAI}, 2018.
+
+\bibitem{bhadra2021} S.~Bhadra et al. On hallucinations in tomographic image reconstruction. \textit{IEEE TMI} 40(11), 2021. \href{https://arxiv.org/abs/2012.00646}{arXiv:2012.00646}.
+
+\bibitem{zhou2022} X.~Zhou et al. Super-resolution of brain tumor MRI images based on deep learning. \textit{J. Appl. Clin. Med. Phys.}, 2022. \href{https://aapm.onlinelibrary.wiley.com/doi/full/10.1002/acm2.13758}{Link}.
+
+\bibitem{ronneberger2015} O.~Ronneberger, P.~Fischer, and T.~Brox. U-Net: Convolutional Networks for Biomedical Image Segmentation. \textit{MICCAI}, 2015. \href{https://arxiv.org/abs/1505.04597}{arXiv:1505.04597}.
+
+\bibitem{menze2015} B.~Menze et al. The Multimodal Brain Tumor Image Segmentation Benchmark (BraTS). \textit{IEEE TMI}, 2015. \href{https://doi.org/10.1109/TMI.2014.2377694}{DOI}.
+
+\bibitem{gal2016} Y.~Gal and Z.~Ghahramani. Dropout as a Bayesian Approximation. \textit{ICML}, 2016. \href{https://arxiv.org/abs/1506.02142}{arXiv:1506.02142}.
+
+\bibitem{tanno2021} R.~Tanno et al. Uncertainty modelling in deep learning for safer neuroimage enhancement. \textit{NeuroImage} 225:117366, 2021.
+
+\bibitem{gudbjartsson1995} H.~Gudbjartsson and S.~Patz. The Rician distribution of noisy MRI data. \textit{Magn. Reson. Med.} 34(6):910--914, 1995.
+
+\bibitem{man2023} C.~Man et al. Deep learning enhanced 0.055T brain MRI. \textit{Science Advances} 9:eadi9327, 2023. \href{https://doi.org/10.1126/sciadv.adi9327}{DOI}.
+
+\bibitem{johnson2023} P.~M.~Johnson and Y.~W.~Lui. Low-field MRI and the promise of deep learning. \textit{Nature} 623:700--701, 2023.
+
+\bibitem{anazodo2024} U.~Anazodo et al. The future of MRI in Africa. \textit{Nature Communications}, 2024. \href{https://www.nature.com/articles/s41467-024-46567-3}{Link}.
+
+\end{thebibliography}
+
+\end{document}
