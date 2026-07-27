@@ -72,6 +72,12 @@ def _infer(seg, sr_d, sr_t, hr, factor, sigma, device, seed=0):
         versions = {"low-res": lr, "distortion": sr_d(lr), "tumor-aware": sr_t(lr),
                     "true HR": hr}
     mean, unc = mc_predict(sr_t, lr, passes=15)
+    # mc_predict leaves dropout switched on. Without restoring eval mode, every
+    # later call to this function would super-resolve with dropout active, so
+    # each slice after the first would get a stochastic, degraded tumor-aware
+    # reconstruction and the comparison against the distortion model would be
+    # silently unfair.
+    sr_t.eval()
     return versions, lr, mean, unc
 
 

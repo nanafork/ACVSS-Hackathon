@@ -48,7 +48,7 @@
 {\headfont\normalsize\color{mid} Why image-quality metrics are the wrong target for safe enhancement of low-field brain MRI}
 
 \vspace{0.25em}
-{\color{muted}\small Victor Oyindouye Miene \quad Nthabiseng Thema \quad Adiza Alhassan \quad\textperiodcentered\quad ACVSS Hackathon}
+{\color{muted}\small Adiza Alhassan \quad Nthabiseng Thema \quad Albert Dodoo \quad Victor Oyindouye Miene \quad Hassan Suliman \quad\textperiodcentered\quad ACVSS Hackathon}
 
 \vspace{0.4em}
 \thinrule
@@ -105,6 +105,28 @@ We segment the tumor with a compact 2D U-Net trained on BraTS~\cite{menze2015}. 
   \item \textbf{False Positive Detection Rate (hallucination):} the rate at which tumor-like structure is fabricated outside the true mask.
 \end{itemize}
 Because the two SR models can be reconstructed at different image quality, we also sweep the degradation severity and compare erasure at matched quality, which isolates the effect of the objective from the effect of sharpness.
+
+\subsection{Model per stage}
+Table~\ref{tab:stages} lists every stage. All three networks come from one shared U-Net implementation and are trained from scratch; no pretrained weights are used. The two \SR networks are therefore identical in capacity down to the parameter count, so the objective is the only variable that differs between them. The segmenter is frozen before either \SR network is trained: it is the measuring instrument for both safety rates, and a segmenter that continued to learn could adapt to a lesion that an \SR model had erased and conceal the failure being measured. We do not use an adversarial (GAN) objective. Adversarial losses reward outputs that look like plausible tissue, which is the mechanism behind the hallucination failure documented by Cohen et al.~\cite{cohen2018} and Bhadra et al.~\cite{bhadra2021}, so introducing one would confound the effect we are trying to isolate.
+
+\begin{table}[h]
+  \caption{Every stage of the pipeline. Both U-Nets have 1{,}927{,}841 parameters because they share one implementation.}
+  \label{tab:stages}
+  \centering\small
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}p{6.4cm}@{}}
+    \toprule
+    \textbf{Stage} & \textbf{Model} & \textbf{Configuration and objective} \\
+    \midrule
+    Degradation & None (deterministic operator) & k-space truncation at factor~4, then Rician noise at $\sigma = 0.03$, applied on the fly. \\
+    Baseline & The degraded input, and bicubic & Confirms that \SR helps segmentation at all. \\
+    \SR (distortion) & 2D U-Net, 4 levels, base width 32, dropout 0.2, residual output & Pixel L1. Adam, learning rate $10^{-3}$. \\
+    \SR (tumor-aware) & Same architecture as above & Lesion-weighted L1, plus an optional segmentation-consistency term. \\
+    Segmentation & 2D U-Net, base width 32, no dropout, no residual & Binary cross-entropy on clean high-resolution slices, then frozen. \\
+    Uncertainty & Reuse of either \SR network & Dropout active at inference, 10 MC passes; per-pixel standard deviation. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \section{Results}
 

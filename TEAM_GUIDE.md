@@ -97,9 +97,9 @@ flowchart TD
         RENDER --> GIF["rotating GIF"]
     end
 
-    MET --> DEMO2D["demo.py → demo.html (2D)"]
-    PNG --> DEMO3D["demo_3d.py → demo_3d.html (3D)"]
-    GIF --> DEMO3D
+    MET --> MAIN["main_demo.py → main_demo.html (the demo)"]
+    PNG --> MAIN
+    GIF --> MAIN
 ```
 
 **Model shapes**
@@ -121,15 +121,17 @@ Three ways to show it; all run on **CPU, no download**.
 # one-time deps
 pip install "numpy<2" torch scikit-image nibabel matplotlib pyvista imageio-ffmpeg
 
-# 2D safety demo → demo.html (before/after panels, uncertainty, safety table)
-python demo.py
-
-# 3D demo → demo_3d.html (glass brain + tumor meshes + rotating GIF + cm³ readout)
-python demo_3d.py
+# THE demo → main_demo.html (3D viewports + uncertainty + rotating GIF +
+# the 2D per-slice panels and safety table, all in one self-contained page)
+python main_demo.py
 
 # interactive 2D app (optional): needs `pip install gradio`
 python demo.py --gradio
 ```
+
+`main_demo.py` is the only page we present. It supersedes the old `demo_3d.py`
+(3D only) and the unstyled static page `demo.py` used to write; `demo.py`
+remains as the source of the 2D inference helpers and the Gradio app.
 
 If `checkpoints/demo.pt` is missing, `demo.py` quick-trains one on synthetic
 data automatically (so it always runs). To (re)train explicitly:
@@ -175,8 +177,9 @@ viz/               3D visualization (neuro-voxel, vendored + bug-fixed)
 
 viz_bridge.py      3D phantom → real models per slice → PatientVolume + cm³
 render_3d.py       PyVista offscreen → brain3d_*.png + brain3d_rotate.gif
-demo_3d.py         bridge + render → self-contained demo_3d.html
-demo.py            2D static/gradio demo → demo.html
+main_demo.py       THE demo: bridge + render + 2D panels → main_demo.html
+demo.py            2D inference helpers + optional gradio app
+src/palette.py     validated demo/figure colors (do not hardcode hues)
 smoke_test.py      end-to-end synthetic correctness check
 scripts/           train_demo.py, make_notebook.py
 notebooks/         tumor_aware_sr.ipynb  (Kaggle: real BraTS or synthetic)
@@ -197,7 +200,7 @@ checkpoints/demo.pt   trained demo weights (git-ignored, large)
   three separate single-view screenshots instead of one 1×3 subplot. Don't
   "simplify" it back to subplots.
 - Large binaries (`*.pt`, `*.zip`, `demo.html`) are git-ignored. `*.png` too, so
-  the 3D PNGs aren't committed — they're embedded (base64) into `demo_3d.html`.
+  the 3D PNGs aren't committed — they're embedded (base64) into `main_demo.html`.
 
 ---
 

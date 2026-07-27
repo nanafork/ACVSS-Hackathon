@@ -43,7 +43,7 @@
 {\headfont\normalsize\color{mid} Tumor-aware super-resolution: why image-quality metrics are the wrong target for safe enhancement}
 
 \vspace{0.25em}
-{\color{muted}\small ACVSS Hackathon \quad\textperiodcentered\quad Victor Oyindouye Miene, Nthabiseng Thema, Adiza Alhassan}
+{\color{muted}\small ACVSS Hackathon \quad\textperiodcentered\quad Adiza Alhassan, Nthabiseng Thema, Albert Dodoo, Victor Oyindouye Miene, Hassan Suliman}
 
 \vspace{0.4em}
 \thinrule
@@ -108,11 +108,13 @@ Super-resolution is known to improve downstream tumor segmentation (\href{https:
 
 \textbf{Degradation (physics-informed forward model).} We generate low-resolution and high-resolution training pairs by degrading good scans, so the original image is always the answer key. Two steps mimic a low-field scan rather than a plain blur: (1) \textit{resolution loss} by cropping the center of k-space (the frequency-domain image), keeping the low-frequency block and dropping the high-frequency edges, then inverting; (2) \textit{realistic noise} by adding Rician noise, the model MRI magnitude images actually follow.
 
+\textbf{What k-space is, in plain terms.} Every image can be described in two equivalent ways. The familiar way is a grid of pixels. The other way is as a sum of ripples: a smooth broad wave that carries the overall shape, plus progressively finer ripples that carry the edges and the small details. The Fourier transform converts between the two descriptions, and neither one loses information, so an image can be moved back and forth freely. That second description is what radiologists call k-space, and an MRI scanner is unusual in that it measures k-space directly. The scanner does not record pixels and then compute the ripples; it records the ripples and the pixels are computed afterwards. The coarse ripples sit at the center of k-space and the fine ones sit at the edges. A weaker scanner cannot collect the outer ripples in a reasonable scan time, so it comes home with the center and none of the rim, and the reconstructed image looks blurred. Our degradation step does exactly that on purpose: it converts a sharp scan into ripples, throws the outer ones away, and converts back. The result blurs the way a real scanner blurs rather than the way a photo-editing blur filter does, which matters because the two leave different traces for a network to learn from.
+
 \textbf{Two super-resolution models.} We train two small U-Nets with dropout: a \textit{quality-optimal} baseline with a standard pixel loss, and a \textit{tumor-aware} variant whose loss up-weights the tumor region (optionally with a segmentation-consistency term). Keeping dropout active at inference and running several passes (Monte Carlo dropout) yields a spatial uncertainty map.
 
 \textbf{Downstream segmentation.} We segment the tumor with a compact 2D U-Net we train on BraTS. Training our own 2D model avoids the dimensionality and four-modality mismatch of large pretrained 3D models. Segmentation is reported on the three standard nested regions: Whole Tumor (all abnormal tissue including edema), Tumor Core (enhancing plus necrotic core), and Enhancing Tumor (the active enhancing part, small or absent in low-grade cases).
 
-\textbf{Model per stage.} Every network is trained from scratch. No pretrained weights are used, and one shared U-Net implementation serves both tasks so that the objective is the only variable under test.
+\textbf{Model per stage.} Every network is trained from scratch. No pretrained weights are used, and one shared U-Net implementation serves both tasks so that the objective is the only variable under test. We deliberately avoid an adversarial (GAN) objective: adversarial losses reward output that merely looks like plausible tissue, which is the documented mechanism behind hallucinated structure (Cohen et al., 2018; Bhadra et al., 2021), so a GAN would manufacture the second failure mode we are trying to measure.
 
 \begin{center}\small
 \renewcommand{\arraystretch}{1.2}

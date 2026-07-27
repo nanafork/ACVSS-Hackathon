@@ -27,6 +27,7 @@ import torch
 from src.checkpoint import load_models
 from src.degrade import degrade
 from src.metrics import to_mask_np
+from src.uncertainty import mc_predict
 from viz import PatientVolume, VolumeAnalyzer
 
 CKPT = "checkpoints/demo.pt"
@@ -82,20 +83,23 @@ def make_phantom_3d(size: int = 96, depth: int = 96, seed: int = 7):
 
 
 def run_pipeline_3d(vol, gt_mask, seg, sr_d, sr_t, factor, sigma,
-                    device="cpu", seed=0):
+                    device="cpu", seed=0, mc_passes=10):
     """Run the real models slice-by-slice and restack into 3D volumes.
 
-    Returns a dict of (D,H,W) arrays: the tumor-aware and distortion SR image
-    volumes, and predicted tumor-mask volumes for true-HR, tumor-aware, and
-    distortion inputs.
+    Returns a dict of (D,H,W) arrays: the degraded input, the tumor-aware and
+    distortion SR image volumes, predicted tumor-mask volumes for true-HR,
+    tumor-aware and distortion inputs, and the tumor-aware MC dropout
+    uncertainty volume.
     """
     depth = vol.shape[0]
     out = {
+        "lr": np.zeros_like(vol),
         "sr_tumor_aware": np.zeros_like(vol),
         "sr_distortion": np.zeros_like(vol),
         "pred_true": np.zeros_like(gt_mask),
         "pred_tumor_aware": np.zeros_like(gt_mask),
         "pred_distortion": np.zeros_like(gt_mask),
+        "unc_tumor_aware": np.zeros_like(vol),
     }
     rng = np.random.default_rng(seed)
     for z in range(depth):
@@ -109,8 +113,19 @@ def run_pipeline_3d(vol, gt_mask, seg, sr_d, sr_t, factor, sigma,
             out["pred_true"][z] = to_mask_np(seg(hr))
             out["pred_distortion"][z] = to_mask_np(seg(srd))
             out["pred_tumor_aware"][z] = to_mask_np(seg(srt))
+        out["lr"][z] = lr_np
         out["sr_distortion"][z] = srd[0, 0].cpu().numpy()
         out["sr_tumor_aware"][z] = srt[0, 0].cpu().numpy()
+
+    # Uncertainty runs in its own pass, after every deterministic prediction is
+    # already stored. mc_predict leaves dropout switched on, so interleaving it
+    # with the loop above would make the reconstructions themselves stochastic.
+    for z in range(depth):
+        lr = torch.from_numpy(out["lr"][z])[None, None].float().to(device)
+        with torch.no_grad():
+            _, unc = mc_predict(sr_t, lr, passes=mc_passes)
+        out["unc_tumor_aware"][z] = unc[0, 0].cpu().numpy()
+    sr_t.eval()  # restore deterministic inference for any later caller
     return out
 
 
@@ -143,7 +158,9 @@ def build_patient_volumes(spacing=(1.0, 1.0, 1.0), device="cpu", seed=7):
     for name, m in specs.items():
         pv = PatientVolume(
             id=f"phantom-{name}",
-            modalities={"t1": brain_img},
+            # The uncertainty volume rides along as a second "modality" so the
+            # renderer can reach it without changing this function's signature.
+            modalities={"t1": brain_img, "uncertainty": res["unc_tumor_aware"]},
             mask=m.astype(np.uint8),
             affine=np.eye(4),
             spacing=spacing,
