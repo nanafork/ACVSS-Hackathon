@@ -8,6 +8,32 @@ measured on the **val** split; **test was left sealed**.
 
 ---
 
+## ▶ Run the demo
+
+```bash
+pip install torch numpy imageio marimo huggingface_hub
+python safety/scripts/fetch_assets.py     # ~290 MB from HF, one time
+marimo run safety/app.py                  # booth mode, code hidden
+```
+
+Opens on `http://localhost:2718`. Four live panels — **acquired → standard model
+→ ours → ground truth** — with a slice slider, a degradation slider (×2–×8), and
+a **SAFETY LAYER** toggle. Every frame is real inference; nothing is precomputed.
+Runs on CPU if there is no GPU, just slower.
+
+**The beat to present, on the default slice (843):** the standard model loses a
+small lesion and the layer fires red; the tumor-aware model keeps it and stays
+green. Then drag the degradation slider to show it appear and disappear.
+
+Optional but worth it: `python safety/scripts/train_robust_segmenter.py`
+(~25 min on an RTX 6000) writes `safety/robust_seg.pt`, and the app picks it up
+automatically — it roughly halves the false alarms.
+
+Verified end to end with `marimo export html safety/app.py` on a fresh clone:
+all cells execute, both verdict states render.
+
+---
+
 ## 1. The framing
 
 ### The one-sentence pitch
