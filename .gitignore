@@ -20,3 +20,7 @@ env/
 # render outputs and large archives (demo_3d.html embeds them as base64)
 *.png
 *.zip
+
+# large data caches (regenerate with scripts/prepare_msd.py)
+data/*.npz
+!data/real_case.npz
