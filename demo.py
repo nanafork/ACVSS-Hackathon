@@ -34,11 +34,11 @@ from src.uncertainty import mc_predict
 
 # Default to the real-data checkpoint (enhancing tumor, trained on 368 BraTS
 # patients). Override with ACVSS_CKPT to compare against another run.
-CKPT = os.environ.get("ACVSS_CKPT", "checkpoints/demo_et.pt")
+CKPT = os.environ.get("ACVSS_CKPT", "checkpoints/demo_et_v2.pt")
 
 # When this cache is present the 2D panels show real held-out patients rather
 # than the synthetic phantom.
-SLICE_CACHE = os.environ.get("ACVSS_SLICES", "data/slices_et.npz")
+SLICE_CACHE = os.environ.get("ACVSS_SLICES", "data/slices_et_full.npz")
 
 
 def _ensure_models(device: str):

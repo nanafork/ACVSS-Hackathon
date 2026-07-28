@@ -32,7 +32,7 @@ from src.metrics import to_mask_np
 from src.uncertainty import mc_predict
 from viz import PatientVolume, VolumeAnalyzer
 
-CKPT = os.environ.get("ACVSS_CKPT", "checkpoints/demo.pt")
+CKPT = os.environ.get("ACVSS_CKPT", "checkpoints/demo_et_v2.pt")
 
 # A real held-out case, if one has been fetched. When present the 3D scene shows
 # actual anatomy from a patient the models never saw, instead of the phantom.

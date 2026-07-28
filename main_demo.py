@@ -203,26 +203,33 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
-    <div class="tag">The measured result &middot; real BraTS, 71 unseen patients</div>
+    <div class="tag">Validation result &middot; real BraTS, 70 unseen patients</div>
     <h2>At equal segmentation quality, the tumor-aware objective erases fewer enhancing lesions.</h2>
     <div class="vitals">
       <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Distortion-optimal SR</div>
-        <div class="v">41.6<span class="u">%</span></div>
-        <div class="d">mean per-patient erasure</div></div>
+        <div class="v">54.6<span class="u">%</span></div>
+        <div class="d">mean per-patient erasure of enhancing lesions</div></div>
       <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Tumor-aware SR</div>
-        <div class="v">38.4<span class="u">%</span></div>
-        <div class="d">&minus;3.2 points, 95% CI [0.7, 6.9], p&nbsp;=&nbsp;0.007</div></div>
-      <div class="vital"><div class="k"><span class="dot" style="background:var(--accent)"></span>Quality gap</div>
-        <div class="v" style="color:var(--accent-deep)">0.004</div>
-        <div class="d">Dice 0.696 vs 0.692, so sharpness cannot explain the difference</div></div>
+        <div class="v">48.1<span class="u">%</span></div>
+        <div class="d">&minus;6.5 points, 95% CI [5.2, 8.2], p&nbsp;&lt;&nbsp;0.0001</div></div>
+      <div class="vital"><div class="k"><span class="dot" style="background:var(--accent)"></span>Patients helped</div>
+        <div class="v" style="color:var(--accent-deep)">66<span class="u">/70</span></div>
+        <div class="d">1 worse, 3 unchanged. Dice also higher, 0.675 vs 0.660</div></div>
     </div>
-    <p class="note">Real brain MRI from the Medical Segmentation Decathlon (BraTS), split
-    <b>by patient</b> so no slice of a test case was ever trained on. The unit of analysis is
-    the patient, not the lesion: one tumor spans many slices and those outcomes move together,
-    so pooling lesion cross-sections would overstate precision by about 1.7&times;. Paired
-    across 71 patients, the objective <b>helps 29 and hurts 11</b>. The cost is hallucination:
-    the false positive rate rises from 0.310 to 0.371. True HR is the original high-resolution
-    scan; we degrade it to imitate a cheap low-field scanner.</p>
+    <p class="note"><b>These are validation numbers, not the final test result.</b> Three loss
+    configurations are being compared on the validation split; the winner will be evaluated
+    once on 94 held-out test patients, and that single number is the one to quote. Reporting
+    the best of several configurations on the test set would not be an evaluation.</p>
+    <p class="note">Real brain MRI from the Medical Segmentation Decathlon (BraTS), 17,233
+    slices from 468 patients, split <b>by patient</b> so no slice of a held-out case was ever
+    trained on. The unit of analysis is the patient, not the lesion: one tumor spans many
+    slices and those outcomes move together, so pooling lesion cross-sections overstates
+    precision by about 1.5&times;. Brain-masked PSNR differs by 0.23&nbsp;dB (24.51 vs 24.28),
+    measured inside the brain because roughly a tenth of a slice is empty background that both
+    models reproduce for free and which flatters the match. The cost is hallucination, with
+    the false positive rate rising from 0.266 to 0.387.
+    True HR is the original high-resolution scan; we degrade it to imitate a cheap low-field
+    scanner.</p>
   </section>
 
   <section class="slide">
@@ -294,13 +301,12 @@ PAGE = """<!doctype html>
       <li><b>Simulated degradation.</b> It reproduces resolution loss and noise, but not the
           contrast change of a genuinely low-field scanner. We degrade real high-field scans;
           we have not tested a real low-field acquisition.</li>
-      <li><b>The fix costs hallucination.</b> False positive rate rises from 0.310 to 0.371.
+      <li><b>The fix costs hallucination.</b> False positive rate rises from 0.266 to 0.387.
           Which error a clinic can tolerate is a clinical decision, not ours.</li>
-      <li><b>It does not help everyone.</b> Paired across 71 patients, 29 improve and
-          <b>11 get worse</b>. The 95% interval on the mean benefit runs from 0.7 to 6.9
-          points, so the true effect could be small.</li>
-      <li><b>Both objectives still miss most small lesions</b> (63% and 66% erased). This
-          reduces a failure; it does not solve it.</li>
+      <li><b>Numbers on this deck are validation, not test.</b> The final figure comes from
+          one evaluation of one configuration on 94 patients never used for any decision.</li>
+      <li><b>Both objectives still miss about half of enhancing lesions</b> (51% and 58%
+          erased). This reduces a failure; it does not solve it.</li>
       <li><b>Uncertainty is a reliability signal, not a tumor detector.</b> It runs about
           1.5&times; higher inside the lesion than in healthy tissue here, which is
           suggestive rather than diagnostic.</li>
