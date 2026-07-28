@@ -95,8 +95,8 @@ the standard model, at the \emph{same} segmentation quality.
 \textbf{What the tumor detector was given} & \textbf{Tumor missed} \\
 \midrule
 The low-resolution scan, as a cheap scanner produces it & 62.2\% \\
-After standard super-resolution (baseline)              & 54.6\% \\
-\textbf{After tumor-aware super-resolution (ours)}      & \textbf{48.1\%} \\
+After standard super-resolution (baseline)              & 58.0\% \\
+\textbf{After tumor-aware super-resolution (ours)}      & \textbf{51.3\%} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -105,11 +105,17 @@ Super-resolution helps, and ours helps most. 66 of 70 patients improve, 1 is wor
 $p < 0.0001$, and quality is genuinely matched rather than approximately: Dice 0.660 against
 0.675, and brain-masked PSNR within 0.23~dB, so ours is not simply producing sharper pictures.
 
-None of these figures should be read as ``half the tumors disappear'', because the detector
-itself is responsible for most of them. Handed the untouched original scan, it already misses
-\textbf{45.5\%} --- that is the floor. Measured against it, standard super-resolution adds 9.1
-points of missed tumor and ours adds 2.6, so \textbf{our objective removes 71\% of the erasure
-super-resolution actually causes}.
+Standard super-resolution recovers some of what the low-resolution scan loses, and ours
+recovers substantially more: \textbf{6.7 points fewer lesions missed than the baseline}, at
+matched quality.
+
+One caveat to have ready, because it is the first thing a careful reader will ask. These rates
+are not ``half the tumors disappear'': the tumor detector we measure through is itself
+imperfect, and on the untouched original scan it already misses 47.6\% of these small
+components. Most of every figure in the table is that detector rather than the
+super-resolution, which is also why the improvement from 58.0\% to 51.3\% is larger than it
+looks --- it is 6.7 points out of the roughly 10 that super-resolution is responsible for at
+all.
 
 \subsection*{Is a rate near 50\% bad? Split it by lesion size}
 
@@ -141,8 +147,10 @@ counting a fragmenting rim as many equal lesions.
         too small to matter to a pixel-error score.
   \item \textbf{The patient is the unit of analysis.} One tumor spans many slices and appears
         as a lesion in each, so those outcomes are correlated; pooling them fakes an interval
-        about 1.5 times too tight. Resampling patients instead gives a mean paired difference
-        of 6.5 points, 95\% CI $[5.2, 8.2]$.
+        about 1.5 times too tight. The table above pools every cross-section, which is fine for
+        reading off rates but not for a confidence interval. Computing one rate per patient and
+        resampling patients gives a mean paired difference of 6.5 points, 95\% CI
+        $[5.2, 8.2]$.
   \item \textbf{The weakest link is the detector, not the super-resolution.} It misses 45.5\% of
         lesions on an untouched scan. A stronger downstream segmenter would buy more than a
         better loss function.
