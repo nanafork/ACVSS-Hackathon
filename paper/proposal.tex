@@ -67,6 +67,8 @@ Portable low-field MRI could widen access to brain imaging where scanners are sc
 
 \thinrule
 
+\thinrule
+
 \section*{Definitions}
 
 \newcommand{\dt}[1]{\textbf{#1}}
@@ -78,6 +80,7 @@ Portable low-field MRI could widen access to brain imaging where scanners are sc
   \item \dt{Rician noise:} the distribution that MRI magnitude images follow. It arises when independent Gaussian noise on the real and imaginary channels is converted to a magnitude, and it departs from Gaussian behavior at low signal-to-noise ratio (Gudbjartsson and Patz, 1995).
   \item \dt{Out-of-distribution:} an input unlike the data a model was trained on. Low-field scans are out-of-distribution for models trained on high-field scans.
   \item \dt{BraTS (Brain Tumor Segmentation challenge):} a public multi-modal brain MRI dataset with expert tumor masks (Menze et al., 2015). Its three nested regions are Whole Tumor (all abnormal tissue including edema), Tumor Core (enhancing plus necrotic core), and Enhancing Tumor (the active enhancing part, which is small or absent in low-grade cases).
+  \item \dt{Lesion:} clinically, an area of abnormal tissue, here a tumor. In our metrics the word is used far more narrowly: a \emph{lesion} is one connected component of the binary tumor mask within a \emph{single 2D slice}. A tumor spanning twenty axial slices therefore counts as twenty lesions, a thin or broken enhancing rim fragments into several more within each slice, and a five-pixel speck counts the same as a whole tumor. This is why absolute erasure rates look alarming, and why the patient rather than the lesion is the unit of analysis.
   \item \dt{Super-resolution (SR):} recovering a higher-resolution image from a low-resolution one.
   \item \dt{Forward model (degradation):} the operator that maps a high-resolution scan to a simulated low-field one. Ours truncates k-space and then adds Rician noise.
   \item \dt{Truncation factor:} how severely k-space is cropped. Factor~4 keeps the central quarter of each frequency axis and discards the rest.
@@ -176,6 +179,8 @@ Uncertainty AUROC & --- & 0.852 & 0.818 \\
 \textbf{Whole tumor: no benefit.} Repeating the identical pipeline with whole tumor as the target (10.9\% of the image, against 3.5\% for enhancing tumor) removes the effect entirely: 64.6\% against 63.7\% erasure, with worse Dice and worse hallucination. This is what the perception-distortion argument predicts. The objective is only misaligned when erasing the structure costs negligible reconstruction error, so a region covering a ninth of the image has nothing for a lesion-weighted term to correct. The size dependence is evidence for the mechanism rather than a caveat on it.
 
 There is a second finding in that run. For whole tumor, both super-resolution models erase \textit{more} lesions than the degraded input they were given (64.6\% and 63.7\% against 61.5\%) while improving PSNR by more than 3~dB. Enhancement that improves every image-quality score can make the clinical finding harder to detect, which is this proposal's thesis in its strongest form, holding against our own fix as well as the baseline.
+
+\textbf{How to read these numbers.} An erasure rate is only interpretable against the segmenter's own floor, and a ``lesion'' here is a connected component in one 2D slice rather than a tumor. Both matter enough to mislead. \textbf{See the companion document \texttt{results.pdf}} for the four questions anyone presenting this work should be able to answer.
 
 \textbf{Honest limits.} The benefit is real but modest and not universal: the interval admits an effect as small as 0.7 points, and 11 of 71 patients are worse off. Both objectives still miss roughly two thirds of small enhancing lesions. Degradation is simulated from high-field scans, so a genuinely low-field acquisition remains untested.
 
