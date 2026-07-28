@@ -65,6 +65,10 @@ confusing number below traces back to one of them.
         are fabricated, divided by the number of predicted blobs, where a blob counts as
         fabricated if less than 10\% of it sits inside real tumor. Lower is safer, and it tends
         to move against erasure.
+  \item \textbf{Dice is} a measure of how much two outlines overlap, from 0 for none to 1 for
+        identical. We report it because it is how we check the two models are compared at equal
+        segmentation quality: if ours simply segmented better across the board, the difference
+        in erasure could not be credited to the training objective.
   \item \textbf{The floor is} what the tumor detector misses when handed the untouched original
         scan, with no degradation or reconstruction involved. It is large, so it is the
         denominator every erasure rate must be read against.
@@ -78,7 +82,7 @@ confusing number below traces back to one of them.
 
 \section*{The result}
 
-Sharpening a cheap blurry scan with AI can quietly delete a small tumor, because the model is
+Super-resolution on a cheap blurry scan can quietly delete a small tumor, because the model is
 graded on average pixel error and a small tumor is a tiny fraction of the pixels. We changed
 what the model is punished for, weighting errors inside the tumor far more heavily, and then
 measured how much tumor survives. On 70 held-out BraTS patients it loses far less tumor than
@@ -86,22 +90,26 @@ the standard model, at the \emph{same} segmentation quality.
 
 \begin{center}\small
 \renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.4cm}cc@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{8.2cm}c@{}}
 \toprule
-\textbf{What the tumor detector was given} & \textbf{Tumor missed} & \textbf{Caused by sharpening} \\
+\textbf{What the tumor detector was given} & \textbf{Tumor missed} \\
 \midrule
-The original scan, untouched           & 45.5\% & --- \\
-Standard sharpening (baseline)         & 54.6\% & $+9.1$ points \\
-\textbf{Tumor-aware sharpening (ours)} & \textbf{48.1\%} & \textbf{$+2.6$ points} \\
+The low-resolution scan, as a cheap scanner produces it & 62.2\% \\
+After standard super-resolution (baseline)              & 54.6\% \\
+\textbf{After tumor-aware super-resolution (ours)}      & \textbf{48.1\%} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The detector already misses 45.5\% on a perfect scan, so most of the middle column is nothing
-to do with sharpening. Sharpening adds
-9.1 points on top of that floor and \textbf{our objective removes 71\% of that damage}. 66 of
-70 patients improve, 1 is worse, $p < 0.0001$. Quality is genuinely matched, not approximately:
-Dice 0.660 against 0.675, and brain-masked PSNR within 0.23~dB.
+Super-resolution helps, and ours helps most. 66 of 70 patients improve, 1 is worse,
+$p < 0.0001$, and quality is genuinely matched rather than approximately: Dice 0.660 against
+0.675, and brain-masked PSNR within 0.23~dB, so ours is not simply producing sharper pictures.
+
+None of these figures should be read as ``half the tumors disappear'', because the detector
+itself is responsible for most of them. Handed the untouched original scan, it already misses
+\textbf{45.5\%} --- that is the floor. Measured against it, standard super-resolution adds 9.1
+points of missed tumor and ours adds 2.6, so \textbf{our objective removes 71\% of the erasure
+super-resolution actually causes}.
 
 \subsection*{Is a rate near 50\% bad? Split it by lesion size}
 
@@ -109,19 +117,18 @@ Dice 0.660 against 0.675, and brain-masked PSNR within 0.23~dB.
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Lesion size} & \textbf{How many} & \textbf{Floor} & \textbf{Baseline adds} & \textbf{Ours adds} \\
+\textbf{Lesion size} & \textbf{How many} & \textbf{Low-resolution} & \textbf{Baseline} & \textbf{Ours} \\
 \midrule
-Small, $<50$ px    & 6{,}762 (71\%) & 65.1\% & $+13.5$ & $+4.7$ \\
-Medium, 50--200 px & 1{,}005        & 10.0\% & $+6.4$  & $+3.5$ \\
-Large, $>200$ px   & 1{,}723        & 0.5\%  & $+0.7$  & $+0.4$ \\
+Small, $<50$ px    & 6{,}762 (71\%) & 82.1\% & 78.6\% & \textbf{69.8\%} \\
+Medium, 50--200 px & 1{,}005        & 30.0\% & 16.4\% & \textbf{13.5\%} \\
+Large, $>200$ px   & 1{,}723        & 3.2\%  & 1.2\%  & \textbf{0.9\%} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Read the bottom row first: a lesion above 200~px is missed 0.5\% of the time on a perfect scan
-and 0.9\% after our reconstruction, so substantial tumors are not vanishing. The overall rate
-is high because 71\% of components are under 50~px and two thirds of those are missed even on
-the original image. Small does not mean unimportant --- a 30~px enhancing focus can be an early
+Start with the bottom row: a large lesion is missed under 1\% of the time by either model, so
+substantial tumors are not vanishing. The overall rate is high because 71\% of all components
+are under 50~px, and the detector misses 65.1\% of those even on the untouched original scan. Small does not mean unimportant --- a 30~px enhancing focus can be an early
 recurrence, and this is where the remaining work is --- but it is also partly an artefact of
 counting a fragmenting rim as many equal lesions.
 
@@ -136,7 +143,7 @@ counting a fragmenting rim as many equal lesions.
         as a lesion in each, so those outcomes are correlated; pooling them fakes an interval
         about 1.5 times too tight. Resampling patients instead gives a mean paired difference
         of 6.5 points, 95\% CI $[5.2, 8.2]$.
-  \item \textbf{The weakest link is the detector, not the sharpening.} It misses 45.5\% of
+  \item \textbf{The weakest link is the detector, not the super-resolution.} It misses 45.5\% of
         lesions on an untouched scan. A stronger downstream segmenter would buy more than a
         better loss function.
   \item \textbf{The limit: it is not free.} Protecting tumors makes the model readier to report
