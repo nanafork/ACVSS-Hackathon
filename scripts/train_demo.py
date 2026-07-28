@@ -40,6 +40,13 @@ def main():
                     help="which cached split to train on")
     ap.add_argument("--seg-lambda", type=float, default=0.0,
                     help="weight on the segmentation-consistency term; 0 disables it")
+    ap.add_argument("--seg-from", default="",
+                    help="load the frozen segmenter from this checkpoint instead "
+                         "of training a fresh one. The segmenter is the measuring "
+                         "instrument for both safety rates, so when comparing SR "
+                         "objectives every config must share one: GPU training is "
+                         "nondeterministic, and a per-config segmenter changes the "
+                         "yardstick between the things being compared.")
     ap.add_argument("--seed", type=int, default=0,
                     help="torch seed. Every run so far used 0, so we have no\n                         estimate of run-to-run variance; vary it to get one.")
     ap.add_argument("--out", default="checkpoints/demo.pt")
@@ -62,7 +69,14 @@ def main():
     print(f"device={device} train={len(train_ds)} size={args.size} kind={kind}")
 
     seg = seg_unet(base=32)
-    train_segmenter(seg, train_ds, epochs=args.seg_epochs, bs=8, device=device)
+    if args.seg_from:
+        from src.checkpoint import load_models as _lm
+        shared, _, _, _ = _lm(args.seg_from, device=device)
+        seg.load_state_dict(shared.state_dict())
+        print(f"segmenter loaded from {args.seg_from} (shared measuring instrument)")
+    else:
+        train_segmenter(seg, train_ds, epochs=args.seg_epochs, bs=8, device=device)
+    seg.eval()
     for p in seg.parameters():
         p.requires_grad_(False)
 
@@ -87,7 +101,8 @@ def main():
                       "kind": kind, "source": args.cached or args.root or "procedural",
                       "weight": args.weight, "seg_lambda": args.seg_lambda,
                       "sr_epochs": args.sr_epochs,
-                      "seed": args.seed})
+                      "seed": args.seed,
+                      "seg_from": args.seg_from or "trained here"})
     print("saved", args.out)
 
 
