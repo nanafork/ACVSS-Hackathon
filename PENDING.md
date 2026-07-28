@@ -5,6 +5,13 @@ checkpoint provenance live in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## Blocking the presentation
 
+- [ ] **Shared-segmenter rerun** (`--seg-from`, written and pushed). Four configs,
+      one frozen segmenter, ~50 min. Needed before the seg_lambda ranking can be
+      claimed. **Blocked on a live GPU box** -- two molab sandboxes have now
+      terminated after roughly an hour each.
+- [ ] **The single test evaluation.** 94 held-out patients, one config, once.
+      Nothing has touched test on the new data.
+
 - [x] Paper, proposal and deck all carry the corrected real-BraTS numbers with
       patient-level statistics; both PDFs rebuild clean
 - [ ] **Whole-tumor table is pre-audit.** It was produced before the dropout

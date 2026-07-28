@@ -355,6 +355,51 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
+    <div class="tag">A second finding</div>
+    <h2>The erasure&ndash;hallucination tradeoff is a dial, not a fixed price.</h2>
+    <p class="note">Protecting tumors costs false alarms. A loss that says "get the lesion
+    region right" also rewards over-painting anything lesion-like, and that overshoot
+    <i>is</i> hallucination. We expected to report that cost and leave it. Instead it turns
+    out to be adjustable, using a term that supervises the downstream segmenter directly
+    instead of weighting pixels.</p>
+    <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
+      border-radius:14px; padding:.4rem">
+      <tr>
+        <th>objective</th>
+        <th class=num>erasure removed<br><span style="font-weight:400;text-transform:none;letter-spacing:0">the win</span></th>
+        <th class=num>hallucination added<br><span style="font-weight:400;text-transform:none;letter-spacing:0">the cost</span></th>
+      </tr>
+      <tr><td>lesion-weighted only &nbsp;<span style="color:var(--ink-light)">seg&lambda;=0</span></td>
+        <td class=num style="color:var(--safe)"><b>&minus;6.64 pp</b></td>
+        <td class=num style="color:var(--erased)"><b>+0.121</b></td></tr>
+      <tr><td>+ segmentation consistency &nbsp;<span style="color:var(--ink-light)">seg&lambda;=0.5</span></td>
+        <td class=num style="color:var(--safe)">&minus;4.86 pp</td>
+        <td class=num style="color:var(--erased)">+0.055</td></tr>
+      <tr><td>+ heavier lesion weight &nbsp;<span style="color:var(--ink-light)">w=80, seg&lambda;=0.5</span></td>
+        <td class=num style="color:var(--safe)">&minus;3.46 pp</td>
+        <td class=num style="color:var(--erased)"><b>+0.017</b></td></tr>
+    </table>
+    <p class="note"><b>Why the term does this.</b> Lesion weighting is one-sided: it only asks
+    that the tumor region be reconstructed accurately, so the cheapest way to satisfy it is to
+    make everything tumour-ish brighter and more solid. The consistency term instead penalises
+    the reconstruction whenever the frozen segmenter's output on it disagrees with the true
+    mask &mdash; in <i>either</i> direction. It therefore punishes inventing tumor as well as
+    losing it. Two-sided supervision, against a one-sided proxy.</p>
+    <p class="note">This term existed in our codebase from the start and had never been
+    trained with. It does not improve the headline metric, so on erasure alone the simple
+    lesion-weighted loss still wins. What it offers is a <b>choice</b>: a screening setting
+    that cannot afford false alarms can give up roughly half the erasure gain and take the
+    hallucination cost to almost nothing.</p>
+    <p class="note" style="color:var(--erased)"><b>Held back deliberately.</b> Each row above
+    trained its own segmenter, and the segmenter is the instrument that measures both rates.
+    The low-resolution baseline &mdash; which uses no reconstruction at all and depends only on
+    the segmenter &mdash; came out at 0.622, 0.715 and 0.719 across the three rows. Those
+    should be identical. GPU training is nondeterministic, so these three objectives were
+    measured with three different rulers. The ranking is suggestive and <b>not yet a
+    result</b>; the rerun that shares one frozen segmenter is written and queued.</p>
+  </section>
+
+  <section class="slide">
     <div class="tag">Four viewports</div>
     <h2>What each objective leaves behind.</h2>
     <div class="panels">

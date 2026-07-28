@@ -68,6 +68,57 @@ The effect survives, but the earlier "roughly 5 sigma" claim was wrong. The
 honest statement is p is about 0.01 with a wide interval, and the fix does not
 help every patient: 11 of 71 got worse.
 
+## Runs 6-8 - validation sweep on the rebuilt data (2026-07-28)
+
+Data: `et_full.npz`, 17,233 slices from 468 patients (lesion-centred 48-slice
+window, filter after crop). Split by patient: train 11,111 / val 2,650 / test
+3,472 slices; 304 / 70 / 94 cases. **Test untouched.**
+
+| config | erasure removed | hallucination added | Dice (ours) | small-lesion erasure |
+|---|---|---|---|---|
+| `w=40, seg_lambda=0` | **-6.64 pp** | +0.121 | 0.675 | 0.698 |
+| `w=40, seg_lambda=0.5` | -4.86 pp | +0.055 | 0.678 | 0.748 |
+| `w=80, seg_lambda=0.5` | -3.46 pp | **+0.017** | 0.677 | 0.748 |
+
+Checkpoints and raw results: `douyeszn/tumor-aware-sr` on HF, and
+`results/val/val_*.json`.
+
+**Finding: the erasure-hallucination tradeoff is adjustable.** `seg_consistency_loss`
+had been in `src/losses.py` from the start and had never been trained with. It
+does not improve erasure -- the plain lesion-weighted loss still wins there --
+but it takes the hallucination penalty from +0.121 to +0.017. Lesion weighting is
+one-sided (make the lesion region accurate, which rewards over-painting anything
+lesion-like); the consistency term is two-sided (the segmenter's output must
+match the true mask, so fabricating is punished as well as losing).
+
+**This ranking is confounded and is not yet a result.** Each config trained its
+own segmenter, and the segmenter measures both rates. The `lowres` row uses no
+reconstruction at all and depends only on the segmenter, yet it came out at FNER
+0.622 / 0.715 / 0.719 and Dice 0.588 / 0.507 / 0.497 across the three configs.
+Those should be identical. GPU training is nondeterministic without
+`torch.use_deterministic_algorithms`, so three objectives were compared with
+three different rulers. `train_demo.py --seg-from` now loads one frozen
+segmenter for every config; the repeat is queued and needs a live GPU box.
+
+### The segmenter's own floor (why absolute rates mislead)
+
+Running the frozen segmenter on the **untouched original scan** -- no
+degradation, no reconstruction -- on the 70 validation patients:
+
+| lesion size | n | erased on the original scan | baseline adds | ours adds |
+|---|---|---|---|---|
+| small <50 px | 6,762 (71%) | **65.1%** | +13.5 | +4.7 |
+| medium 50-200 px | 1,005 | 10.0% | +6.4 | +3.5 |
+| large >200 px | 1,723 | 0.5% | +0.7 | +0.4 |
+| **overall** | 9,490 | **45.5%** | +9.1 | +2.6 |
+
+An absolute erasure rate near 50% is mostly this floor, not damage done by
+super-resolution. Large lesions are essentially never lost by either model. The
+number attributable to the pipeline is the excess, and the tumor-aware objective
+removes about 71% of it overall and two thirds of it in the small bin that
+dominates the count. `evaluate_pipeline` now emits a `truehr` row and
+`erasure_above_floor` so no table can be quoted without its denominator.
+
 ## Runs
 
 ### Run 1 — original quick checkpoint (superseded)
