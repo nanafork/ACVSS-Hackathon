@@ -135,11 +135,9 @@ PAGE = """<!doctype html>
   .vital.safe .v{{color:var(--safe)}} .vital.erased .v{{color:var(--erased)}}
   .dot{{display:inline-block; width:.5em; height:.5em; border-radius:50%; margin-right:.5em}}
 
-  /* Stacked bars separating the segmenter's own blind spot from the erasure our
-     pipeline adds. Stacked rather than side-by-side on purpose: the point is
-     that the two parts are not comparable quantities and only the second is
-     ours to fix. Grey is deliberately not one of the model hues, because it is
-     a baseline rather than an identity. */
+  /* Three bars, one per image handed to the same frozen detector: the cheap
+     scan, then each reconstruction. Grey for the low-resolution input because it
+     is the starting point rather than a model, so it must not look like one. */
   .ladder{{margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
     border-radius:14px; padding:1.2rem 1.3rem}}
   .lrow{{display:grid; grid-template-columns:15rem 1fr 9rem; gap:1rem;
@@ -242,59 +240,48 @@ PAGE = """<!doctype html>
 
   <section class="slide">
     <div class="tag">Validation result &middot; real BraTS, 70 unseen patients</div>
-    <h2>At equal segmentation quality, the tumor-aware objective erases fewer enhancing lesions.</h2>
+    <h2>Super-resolution recovers tumor the cheap scan loses. Ours recovers more of it.</h2>
     <div class="vitals">
-      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Distortion-optimal SR <b style="color:var(--ink-mid)">(baseline)</b></div>
-        <div class="v">+9.1<span class="u">pp</span></div>
-        <div class="d">erasure it causes, above the segmenter's floor of 45.5%</div></div>
+      <div class="vital"><div class="k"><span class="dot" style="background:#9BA1A6"></span>Low-resolution scan</div>
+        <div class="v" style="color:var(--ink-mid)">62.2<span class="u">%</span></div>
+        <div class="d">of enhancing lesions missed, before any super-resolution</div></div>
+      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Standard SR <b style="color:var(--ink-mid)">(baseline)</b></div>
+        <div class="v">58.0<span class="u">%</span></div>
+        <div class="d">recovers some of what the cheap scan loses</div></div>
       <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Tumor-aware SR <b style="color:var(--safe)">(OURS)</b></div>
-        <div class="v">+2.6<span class="u">pp</span></div>
-        <div class="d">erasure ours causes &mdash; removes <b>71%</b> of the damage</div></div>
-      <div class="vital"><div class="k"><span class="dot" style="background:var(--accent)"></span>Patients helped</div>
-        <div class="v" style="color:var(--accent-deep)">66<span class="u">/70</span></div>
-        <div class="d">1 worse, 3 unchanged; p&nbsp;&lt;&nbsp;0.0001, 95% CI [5.2, 8.2] pp</div></div>
+        <div class="v">51.3<span class="u">%</span></div>
+        <div class="d">&minus;6.7 points vs baseline, at matched quality</div></div>
     </div>
-    <h3 style="margin-top:2rem">Read this before the numbers above.</h3>
-    <p class="note" style="margin-top:.3rem">We hand the <i>same</i> frozen tumor segmenter
-    three different images and count how many enhancing lesions it fails to find. The first
-    image is the untouched original scan. It is the control, and it is the reason the
-    percentages above are written the way they are.</p>
-
     <div class="ladder">
       <div class="lrow">
-        <div class="llab">Untouched original scan<span>the control</span></div>
-        <div class="lbar"><i class="floor" style="width:75.8%"></i></div>
-        <div class="lnum">45.5%<span>missed</span></div>
+        <div class="llab">Low-resolution scan<span>what a cheap scanner produces</span></div>
+        <div class="lbar"><i class="floor" style="width:88.9%"></i></div>
+        <div class="lnum">62.2%<span>missed</span></div>
       </div>
       <div class="lrow">
-        <div class="llab">Distortion-optimal SR <span style="display:inline;font-weight:600;color:var(--ink-mid)">(baseline)</span><span>the standard approach: trained only for image quality</span></div>
-        <div class="lbar"><i class="floor" style="width:75.8%"></i><i class="add di" style="width:15.2%"></i></div>
-        <div class="lnum">54.6%<span><b style="color:var(--erased)">+9.1</b> caused by SR</span></div>
+        <div class="llab">Standard super-resolution <span style="display:inline;font-weight:600;color:var(--ink-mid)">(baseline)</span><span>trained only for image quality</span></div>
+        <div class="lbar"><i class="add di" style="width:82.9%"></i></div>
+        <div class="lnum">58.0%<span>missed</span></div>
       </div>
       <div class="lrow">
-        <div class="llab">Tumor-aware SR <span style="display:inline;font-weight:700;color:var(--safe)">(OURS)</span><span>our objective: lesion-weighted loss</span></div>
-        <div class="lbar"><i class="floor" style="width:75.8%"></i><i class="add ta" style="width:4.3%"></i></div>
-        <div class="lnum">48.1%<span><b style="color:var(--safe)">+2.6</b> caused by SR</span></div>
+        <div class="llab">Tumor-aware super-resolution <span style="display:inline;font-weight:700;color:var(--safe)">(OURS)</span><span>our objective: lesion-weighted loss</span></div>
+        <div class="lbar"><i class="add ta" style="width:73.3%"></i></div>
+        <div class="lnum">51.3%<span><b style="color:var(--safe)">&minus;6.7</b> vs baseline</span></div>
       </div>
       <div class="lscale"><div><span>0%</span>
-        <span class="mid">of enhancing lesion components missed</span><span>60%</span></div></div>
+        <span class="mid">of enhancing lesion components missed</span><span>70%</span></div></div>
       <div class="lkey">
-        <span><i class="sw floor"></i>missed on the original scan too &mdash; the segmenter's
-        own blind spot, not caused by us</span>
-        <span><i class="sw di"></i><i class="sw ta"></i>additionally missed because the scan
-        was degraded and reconstructed &mdash; <b>this is the part we can fix</b></span>
+        <span>Same frozen tumor detector in all three rows. Only the image it is given changes,
+        so the difference is caused by the reconstruction and not by a different detector.</span>
       </div>
     </div>
 
-    <p class="note"><b>So the honest claim is not "48.1% versus 54.6%".</b> Both of those are
-    dominated by the grey bar, which no super-resolution model is responsible for. The part
-    attributable to degrading a scan and reconstructing it is 9.1 points for the standard
-    objective and 2.6 for ours. <b>The tumor-aware objective removes 71% of the erasure that
-    super-resolution itself introduces</b> (9.1 &rarr; 2.6), and that is the number the paper
-    reports.</p>
-    <p class="note">The flip side, stated plainly: because the grey bar is so large, the
-    biggest available win is not a better loss function but a better downstream segmenter.
-    Ours misses nearly half of all enhancing lesion components on a perfect image.</p>
+    <p class="note"><b>One caveat worth having ready.</b> These are not "half the tumors
+    disappear". The tumor detector we measure through is itself imperfect: handed the original
+    scan it already misses 47.6% of these small components. Most of every number above is that
+    detector rather than the super-resolution, which is why a 6.7 point gain is larger than it
+    looks &mdash; it is 6.7 of the roughly 10 points super-resolution is responsible for at all.</p>
+
     <p class="note"><b>These are validation numbers, not the final test result.</b> Three loss
     configurations are being compared on the validation split; the winner will be evaluated
     once on 94 held-out test patients, and that single number is the one to quote. Reporting
@@ -472,10 +459,10 @@ PAGE = """<!doctype html>
           Which error a clinic can tolerate is a clinical decision, not ours.</li>
       <li><b>Numbers on this deck are validation, not test.</b> The final figure comes from
           one evaluation of one configuration on 94 patients never used for any decision.</li>
-      <li><b>The segmenter is the weakest link, not the enhancement.</b> It misses 45.5% of
-          enhancing lesion components on the untouched original scan. A stronger downstream
-          model would matter more than a better loss, and every erasure rate here has to be
-          read against that floor.</li>
+      <li><b>The tumor detector is the weakest link, not the enhancement.</b> It misses 47.6%
+          of these components on the untouched original scan, so most of every rate above is
+          the detector rather than the reconstruction. A stronger downstream model would buy
+          more than a better loss.</li>
       <li><b>Lesion components fragment.</b> An enhancing rim breaks into many small
           4-connected pieces, so component counts run high and each counts equally. That
           inflates absolute rates and is part of why the floor is so large.</li>
