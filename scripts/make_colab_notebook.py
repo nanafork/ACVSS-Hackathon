@@ -88,20 +88,86 @@ trained checkpoint — so a disconnect does not cost you the run."""),
     (CODE, """from google.colab import drive
 drive.mount('/content/drive')"""),
 
+    (MD, """## 2b. Optional: download BraTS2020 from Kaggle
+
+Pulls the data straight into this runtime. Colab's connection is much faster
+than a home one, and nothing has to pass through your machine or Drive. This
+mirror needs **no competition registration**, which is what usually blocks
+people on the official CBICA/Synapse releases.
+
+You need a Kaggle API token: **Kaggle → Settings → API → Create New Token**,
+which downloads `kaggle.json`. The cell caches a copy on Drive, so it only
+prompts you once — later sessions pick it up automatically.
+
+Set `USE_KAGGLE = False` if your data is already on Drive."""),
+    (CODE, """import glob, shutil
+
+USE_KAGGLE     = True
+KAGGLE_DS      = "awsaf49/brats20-dataset-training-validation"
+KAGGLE_DEST    = "/content/brats_raw"
+TOKEN_ON_DRIVE = "/content/drive/MyDrive/kaggle.json"
+
+
+def _has_brats(root):
+    return bool(glob.glob(os.path.join(root, "**", "*_seg.nii*"), recursive=True))
+
+
+if not USE_KAGGLE:
+    print("USE_KAGGLE = False - skipping; the next cell will search Drive")
+elif _has_brats(KAGGLE_DEST):
+    print(f"{KAGGLE_DEST} already has data - skipping download")
+    DATA_HINT = KAGGLE_DEST
+else:
+    token = os.path.expanduser("~/.kaggle/kaggle.json")
+    if not os.path.exists(token):
+        os.makedirs(os.path.dirname(token), exist_ok=True)
+        if os.path.exists(TOKEN_ON_DRIVE):
+            shutil.copy(TOKEN_ON_DRIVE, token)
+            print(f"using the cached token from {TOKEN_ON_DRIVE}")
+        else:
+            print("Upload kaggle.json  (Kaggle > Settings > API > Create New Token)")
+            from google.colab import files
+            up = files.upload()
+            if "kaggle.json" not in up:
+                raise SystemExit("kaggle.json was not uploaded - re-run this cell.")
+            with open(token, "wb") as fh:
+                fh.write(up["kaggle.json"])
+            try:
+                shutil.copy(token, TOKEN_ON_DRIVE)
+                print(f"cached the token at {TOKEN_ON_DRIVE} for next session")
+            except Exception as e:
+                print("could not cache the token on Drive:", e)
+    os.chmod(token, 0o600)
+
+    !pip -q install kaggle
+    !kaggle datasets download -d $KAGGLE_DS -p $KAGGLE_DEST --unzip
+
+    if not _has_brats(KAGGLE_DEST):
+        raise SystemExit(
+            f"Download finished but no *_seg.nii* files landed in {KAGGLE_DEST}. "
+            "Check the kaggle output above: a 401/403 means the token is stale "
+            "(create a new one), and a 404 means the dataset slug moved.")
+    DATA_HINT = KAGGLE_DEST
+    print("\\ndownloaded to", KAGGLE_DEST)"""),
+
     (MD, """## 3. Point at your BraTS data
 
 `BRATS_ROOT` must be the folder that contains **one subfolder per case**, each
 holding `*_t1c.nii.gz` (or `*_t1ce.nii.gz`) and `*_seg.nii.gz`.
 
-Set `SEARCH_FROM` to anywhere above your data and run the next cell — it walks
-down looking for the folder that actually holds the cases and prints the value
-to use. The usual gotcha is an extra nesting level: the BraTS2020 archive
-unpacks to `BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData/<cases>`."""),
+The next cell walks down from `SEARCH_FROM` looking for the folder that actually
+holds the cases, and prints the value it picked. If the Kaggle cell above ran,
+`SEARCH_FROM` is already set to the download; otherwise it searches Drive.
+
+The usual gotcha is an extra nesting level: the BraTS2020 archive unpacks to
+`BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData/<cases>`."""),
     (CODE, """import glob
 
-SEARCH_FROM = "/content/drive/MyDrive"     # <-- a folder somewhere above the data
+# The Kaggle cell sets DATA_HINT when it downloads; otherwise search Drive.
+SEARCH_FROM = DATA_HINT if "DATA_HINT" in globals() else "/content/drive/MyDrive"
 WORK        = "/content/drive/MyDrive/tumor_aware_sr"
 os.makedirs(WORK, exist_ok=True)
+print("searching under:", SEARCH_FROM)
 
 
 def find_brats_roots(start, max_depth=5):
@@ -208,6 +274,8 @@ LOCAL_ROOT    = "/content/brats"
 
 if os.path.exists(CACHE):
     print(f"slice cache already exists ({CACHE}) - raw volumes not needed, skipping copy")
+elif BRATS_ROOT.startswith("/content/") and not BRATS_ROOT.startswith("/content/drive/"):
+    print(f"{BRATS_ROOT} is already on local disk - no copy needed")
 elif COPY_TO_LOCAL:
     mod_tags = BraTSSliceDataset.MOD_TAGS[MODALITY]
     src_cases = sorted(d for d in glob.glob(os.path.join(BRATS_ROOT, "*"))
