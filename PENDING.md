@@ -37,6 +37,21 @@ checkpoint provenance live in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## Data and compute
 
+- [x] **Lesion-centred slice window** (was: middle 12 slices of the volume,
+      which used 8% of each case and silently dropped 130 of 484 patients whose
+      enhancing tumor sat outside the mid-axial window). Default raised to 48.
+      **Not yet re-extracted or retrained** — needs a GPU box.
+- [ ] **The sandbox terminated (HTTP 410).** Everything downloaded and verified
+      first; lost: the 48-slice extraction in progress, `slices_128.npz`,
+      `demo_gpu.pt`, and the 7.6 GB MSD tar. All regenerable.
+- [ ] **Need a new GPU box** to redo extraction + training on the full data.
+- [ ] **Need an HF token** (write scope) + target repo to push checkpoints
+      during training, so the next termination does not cost a run.
+- [ ] **Uncertainty-gated output**: flag or abstain where MC-dropout std is
+      high, instead of presenting a uniformly crisp image that hides its own
+      doubt. AUROC 0.85/0.82 on real data says the signal is there. Needs no
+      GPU; the most defensible improvement still available.
+
 - [x] Real BraTS via MSD Task01 (no registration wall), 484 cases
 - [x] Case-level train/test split, leakage asserted
 - [x] `demo_brats.pt`, `demo_et.pt`, results JSON, logs, ET slice cache — all
