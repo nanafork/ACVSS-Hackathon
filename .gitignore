@@ -25,3 +25,7 @@ env/
 data/*.npz
 !data/real_case.npz
 data/msd/
+
+# sweep checkpoints live on HF (douyeszn/tumor-aware-sr); fetch, do not commit
+checkpoints/ck_*.pt
+checkpoints/sh_*.pt
