@@ -56,9 +56,8 @@ confusing number below traces back to one of them.
         crossing twenty of them counts as twenty lesions, a thin or broken enhancing rim
         fragments into several more inside each slice, and a five-pixel speck counts the same
         as a whole tumor.
-  \item \textbf{Erasure is} the failure we set out to fix: the reconstruction smooths a real
-        tumor away, so the scan looks normal when it is not. It is also called
-        pseudo-normalization. \textbf{The erasure rate is} the number of true lesions the
+  \item \textbf{Erasure is} the failure we set out to fix.
+        \textbf{The erasure rate is} the number of true lesions the
         model failed to recover, divided by the number of true lesions, where a lesion counts
         as recovered if the prediction covers at least 10\% of it. Lower is safer.
   \item \textbf{Hallucination is} the opposite failure: the reconstruction invents tumor where
