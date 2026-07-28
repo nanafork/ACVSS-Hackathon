@@ -292,6 +292,9 @@ CSS = """
     font-size:.66rem; color:#6A6E73}
   .items li .path{text-transform:none; letter-spacing:0; color:#3E434A}
 
+  /* the sweep arrows sit in the plate column, between levels */
+  .sweep{display:block; position:relative; z-index:2}
+
   figcaption{font-family:var(--serif); font-size:.8rem; color:#3E434A;
     margin-top:1.4rem; padding-top:.9rem; border-top:1px solid #E4E5E2;
     max-width:100ch}
@@ -330,6 +333,46 @@ def _thumb(b64: str, cap: str) -> str:
     """A 2D panel from the same stage, small, beside the plate."""
     return (f'<figure class="thumb"><img src="data:image/png;base64,{b64}" '
             f'alt="{cap}"><figcaption>{cap}</figcaption></figure>')
+
+
+def _sweep(bulge: str = "right", w: int = 430, h: int = 62) -> str:
+    """A hand-drawn style sweep arrow between two levels of the stack.
+
+    A single cubic curve with a small open V head, the way an architectural
+    massing diagram carries you from one stage to the next. The head is computed
+    from the curve's own end tangent rather than guessed, so the V always sits on
+    the direction of travel; alternating the bulge keeps four of them from
+    reading as a printed repeat.
+    """
+    import math
+
+    x0, y0 = (118, 4)
+    x3, y3 = (150, h - 8)
+    if bulge == "right":
+        x1, y1, x2, y2 = 236, 10, 232, h - 22
+    else:
+        x1, y1 = 40, 12
+        x2, y2 = 44, h - 22
+        x0, x3 = 150, 120
+
+    # end tangent of a cubic is 3 * (P3 - P2)
+    tx, ty = x3 - x2, y3 - y2
+    n = math.hypot(tx, ty) or 1.0
+    tx, ty = tx / n, ty / n
+    head = 11.0
+    barbs = []
+    for deg in (26, -26):
+        a = math.radians(deg)
+        # rotate the reversed tangent, so both barbs open behind the tip
+        bx = (-tx) * math.cos(a) - (-ty) * math.sin(a)
+        by = (-tx) * math.sin(a) + (-ty) * math.cos(a)
+        barbs.append(f'M{x3:.1f},{y3:.1f} L{x3 + bx * head:.1f},{y3 + by * head:.1f}')
+
+    return (f'<svg class="sweep" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
+            f'aria-hidden="true"><g fill="none" stroke="#14161A" stroke-width="1.5" '
+            f'stroke-linecap="round">'
+            f'<path d="M{x0},{y0} C{x1},{y1} {x2},{y2} {x3:.0f},{y3:.0f}"/>'
+            f'<path d="{" ".join(barbs)}"/></g></svg>')
 
 
 def _level(no: int, title: str, hue: str, plate: str, items: list[tuple[str, str, str]]) -> str:
@@ -418,6 +461,8 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
          ("Restacked per-slice masks", "marching cubes", GREY),
          ("src/uncertainty.py, render_3d.py", "", GREY)])
 
+    sw_a, sw_b, sw_c = (_sweep("right"), _sweep("left"), _sweep("right"))
+
     order = ["low-res", "distortion", "tumor-aware"]
     label = {"low-res": "low-res input", "distortion": "distortion-optimal (baseline)",
              "tumor-aware": "tumor-aware (ours)"}
@@ -454,13 +499,14 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
 
   <h2>The pipeline</h2>
   <div class="figure"><div class="fig-inner">
-    <div class="stack">{lv3}{lv2}{lv1}{lv0}</div>
+    <div class="stack">{lv3}{sw_a}{lv2}{sw_b}{lv1}{sw_c}{lv0}</div>
     <figcaption><b>Figure 1.</b> The tumor-aware super-resolution pipeline, drawn
     as an exploded stack: one patient, pulled apart into the four stages that act
     on them. Every plate is a 3D volume this pipeline produced, and the small
     panels beside each plate are the 2D output of that same stage on one held-out
-    slice. Dotted verticals are alignment guides, not data flow: the levels are the
-    same brain, separated. Read top to bottom. The degradation is applied on the
+    slice. The sweeping arrows carry the direction of travel; the dotted verticals
+    are alignment guides rather than flow, because the levels are one brain pulled
+    apart, not four different ones. The degradation is applied on the
     fly, so every low-resolution input keeps an exact high-resolution reference and
     no paired low-field acquisition is required. The segmentation network at level 1
     is frozen and shared, which is what makes the two reconstructions at level 2
