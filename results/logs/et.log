@@ -1,0 +1,185 @@
+484 cases, modality t1c (channel 2)
+  25/484 cases -> 180 slices
+  50/484 cases -> 336 slices
+  75/484 cases -> 489 slices
+  100/484 cases -> 660 slices
+  125/484 cases -> 845 slices
+  150/484 cases -> 1018 slices
+  175/484 cases -> 1158 slices
+  200/484 cases -> 1269 slices
+  225/484 cases -> 1439 slices
+  250/484 cases -> 1667 slices
+  275/484 cases -> 1815 slices
+  300/484 cases -> 2007 slices
+  325/484 cases -> 2190 slices
+  350/484 cases -> 2360 slices
+  375/484 cases -> 2541 slices
+  400/484 cases -> 2722 slices
+  425/484 cases -> 2925 slices
+  450/484 cases -> 3149 slices
+  475/484 cases -> 3363 slices
+wrote /tmp/msd/slices_et.npz: (3433, 128, 128) slices from 354 cases, 3.54% tumor pixels
+real data: 2769 slices from 283 cases
+device=cuda train=2769 size=128 kind=cached
+[seg] epoch 1/40 loss 0.1543
+[seg] epoch 2/40 loss 0.0455
+[seg] epoch 3/40 loss 0.0360
+[seg] epoch 4/40 loss 0.0310
+[seg] epoch 5/40 loss 0.0279
+[seg] epoch 6/40 loss 0.0251
+[seg] epoch 7/40 loss 0.0238
+[seg] epoch 8/40 loss 0.0219
+[seg] epoch 9/40 loss 0.0216
+[seg] epoch 10/40 loss 0.0208
+[seg] epoch 11/40 loss 0.0203
+[seg] epoch 12/40 loss 0.0187
+[seg] epoch 13/40 loss 0.0178
+[seg] epoch 14/40 loss 0.0172
+[seg] epoch 15/40 loss 0.0168
+[seg] epoch 16/40 loss 0.0164
+[seg] epoch 17/40 loss 0.0160
+[seg] epoch 18/40 loss 0.0155
+[seg] epoch 19/40 loss 0.0153
+[seg] epoch 20/40 loss 0.0153
+[seg] epoch 21/40 loss 0.0147
+[seg] epoch 22/40 loss 0.0144
+[seg] epoch 23/40 loss 0.0141
+[seg] epoch 24/40 loss 0.0140
+[seg] epoch 25/40 loss 0.0137
+[seg] epoch 26/40 loss 0.0137
+[seg] epoch 27/40 loss 0.0133
+[seg] epoch 28/40 loss 0.0133
+[seg] epoch 29/40 loss 0.0131
+[seg] epoch 30/40 loss 0.0130
+[seg] epoch 31/40 loss 0.0126
+[seg] epoch 32/40 loss 0.0127
+[seg] epoch 33/40 loss 0.0136
+[seg] epoch 34/40 loss 0.0123
+[seg] epoch 35/40 loss 0.0120
+[seg] epoch 36/40 loss 0.0121
+[seg] epoch 37/40 loss 0.0118
+[seg] epoch 38/40 loss 0.0118
+[seg] epoch 39/40 loss 0.0117
+[seg] epoch 40/40 loss 0.0114
+[sr-distortion] epoch 1/60 loss 0.0600
+[sr-distortion] epoch 2/60 loss 0.0440
+[sr-distortion] epoch 3/60 loss 0.0420
+[sr-distortion] epoch 4/60 loss 0.0407
+[sr-distortion] epoch 5/60 loss 0.0396
+[sr-distortion] epoch 6/60 loss 0.0389
+[sr-distortion] epoch 7/60 loss 0.0398
+[sr-distortion] epoch 8/60 loss 0.0384
+[sr-distortion] epoch 9/60 loss 0.0381
+[sr-distortion] epoch 10/60 loss 0.0379
+[sr-distortion] epoch 11/60 loss 0.0376
+[sr-distortion] epoch 12/60 loss 0.0373
+[sr-distortion] epoch 13/60 loss 0.0372
+[sr-distortion] epoch 14/60 loss 0.0369
+[sr-distortion] epoch 15/60 loss 0.0368
+[sr-distortion] epoch 16/60 loss 0.0366
+[sr-distortion] epoch 17/60 loss 0.0364
+[sr-distortion] epoch 18/60 loss 0.0363
+[sr-distortion] epoch 19/60 loss 0.0361
+[sr-distortion] epoch 20/60 loss 0.0360
+[sr-distortion] epoch 21/60 loss 0.0357
+[sr-distortion] epoch 22/60 loss 0.0355
+[sr-distortion] epoch 23/60 loss 0.0354
+[sr-distortion] epoch 24/60 loss 0.0352
+[sr-distortion] epoch 25/60 loss 0.0350
+[sr-distortion] epoch 26/60 loss 0.0348
+[sr-distortion] epoch 27/60 loss 0.0346
+[sr-distortion] epoch 28/60 loss 0.0344
+[sr-distortion] epoch 29/60 loss 0.0342
+[sr-distortion] epoch 30/60 loss 0.0340
+[sr-distortion] epoch 31/60 loss 0.0339
+[sr-distortion] epoch 32/60 loss 0.0336
+[sr-distortion] epoch 33/60 loss 0.0335
+[sr-distortion] epoch 34/60 loss 0.0333
+[sr-distortion] epoch 35/60 loss 0.0332
+[sr-distortion] epoch 36/60 loss 0.0331
+[sr-distortion] epoch 37/60 loss 0.0329
+[sr-distortion] epoch 38/60 loss 0.0328
+[sr-distortion] epoch 39/60 loss 0.0327
+[sr-distortion] epoch 40/60 loss 0.0326
+[sr-distortion] epoch 41/60 loss 0.0325
+[sr-distortion] epoch 42/60 loss 0.0324
+[sr-distortion] epoch 43/60 loss 0.0323
+[sr-distortion] epoch 44/60 loss 0.0323
+[sr-distortion] epoch 45/60 loss 0.0321
+[sr-distortion] epoch 46/60 loss 0.0321
+[sr-distortion] epoch 47/60 loss 0.0319
+[sr-distortion] epoch 48/60 loss 0.0320
+[sr-distortion] epoch 49/60 loss 0.0319
+[sr-distortion] epoch 50/60 loss 0.0318
+[sr-distortion] epoch 51/60 loss 0.0317
+[sr-distortion] epoch 52/60 loss 0.0317
+[sr-distortion] epoch 53/60 loss 0.0316
+[sr-distortion] epoch 54/60 loss 0.0315
+[sr-distortion] epoch 55/60 loss 0.0315
+[sr-distortion] epoch 56/60 loss 0.0314
+[sr-distortion] epoch 57/60 loss 0.0315
+[sr-distortion] epoch 58/60 loss 0.0314
+[sr-distortion] epoch 59/60 loss 0.0313
+[sr-distortion] epoch 60/60 loss 0.0312
+[sr-tumor-aware] epoch 1/60 loss 0.0619
+[sr-tumor-aware] epoch 2/60 loss 0.0467
+[sr-tumor-aware] epoch 3/60 loss 0.0441
+[sr-tumor-aware] epoch 4/60 loss 0.0429
+[sr-tumor-aware] epoch 5/60 loss 0.0419
+[sr-tumor-aware] epoch 6/60 loss 0.0412
+[sr-tumor-aware] epoch 7/60 loss 0.0406
+[sr-tumor-aware] epoch 8/60 loss 0.0403
+[sr-tumor-aware] epoch 9/60 loss 0.0397
+[sr-tumor-aware] epoch 10/60 loss 0.0395
+[sr-tumor-aware] epoch 11/60 loss 0.0392
+[sr-tumor-aware] epoch 12/60 loss 0.0388
+[sr-tumor-aware] epoch 13/60 loss 0.0386
+[sr-tumor-aware] epoch 14/60 loss 0.0385
+[sr-tumor-aware] epoch 15/60 loss 0.0380
+[sr-tumor-aware] epoch 16/60 loss 0.0378
+[sr-tumor-aware] epoch 17/60 loss 0.0374
+[sr-tumor-aware] epoch 18/60 loss 0.0371
+[sr-tumor-aware] epoch 19/60 loss 0.0367
+[sr-tumor-aware] epoch 20/60 loss 0.0362
+[sr-tumor-aware] epoch 21/60 loss 0.0358
+[sr-tumor-aware] epoch 22/60 loss 0.0355
+[sr-tumor-aware] epoch 23/60 loss 0.0349
+[sr-tumor-aware] epoch 24/60 loss 0.0345
+[sr-tumor-aware] epoch 25/60 loss 0.0342
+[sr-tumor-aware] epoch 26/60 loss 0.0340
+[sr-tumor-aware] epoch 27/60 loss 0.0337
+[sr-tumor-aware] epoch 28/60 loss 0.0332
+[sr-tumor-aware] epoch 29/60 loss 0.0332
+[sr-tumor-aware] epoch 30/60 loss 0.0328
+[sr-tumor-aware] epoch 31/60 loss 0.0324
+[sr-tumor-aware] epoch 32/60 loss 0.0322
+[sr-tumor-aware] epoch 33/60 loss 0.0320
+[sr-tumor-aware] epoch 34/60 loss 0.0319
+[sr-tumor-aware] epoch 35/60 loss 0.0318
+[sr-tumor-aware] epoch 36/60 loss 0.0316
+[sr-tumor-aware] epoch 37/60 loss 0.0314
+[sr-tumor-aware] epoch 38/60 loss 0.0312
+[sr-tumor-aware] epoch 39/60 loss 0.0310
+[sr-tumor-aware] epoch 40/60 loss 0.0310
+[sr-tumor-aware] epoch 41/60 loss 0.0308
+[sr-tumor-aware] epoch 42/60 loss 0.0307
+[sr-tumor-aware] epoch 43/60 loss 0.0306
+[sr-tumor-aware] epoch 44/60 loss 0.0304
+[sr-tumor-aware] epoch 45/60 loss 0.0302
+[sr-tumor-aware] epoch 46/60 loss 0.0302
+[sr-tumor-aware] epoch 47/60 loss 0.0301
+[sr-tumor-aware] epoch 48/60 loss 0.0300
+[sr-tumor-aware] epoch 49/60 loss 0.0298
+[sr-tumor-aware] epoch 50/60 loss 0.0297
+[sr-tumor-aware] epoch 51/60 loss 0.0297
+[sr-tumor-aware] epoch 52/60 loss 0.0298
+[sr-tumor-aware] epoch 53/60 loss 0.0295
+[sr-tumor-aware] epoch 54/60 loss 0.0295
+[sr-tumor-aware] epoch 55/60 loss 0.0293
+[sr-tumor-aware] epoch 56/60 loss 0.0293
+[sr-tumor-aware] epoch 57/60 loss 0.0293
+[sr-tumor-aware] epoch 58/60 loss 0.0292
+[sr-tumor-aware] epoch 59/60 loss 0.0291
+[sr-tumor-aware] epoch 60/60 loss 0.0290
+saved checkpoints/demo_et.pt
+

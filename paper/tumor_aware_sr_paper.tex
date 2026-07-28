@@ -130,56 +130,63 @@ Table~\ref{tab:stages} lists every stage. All three networks come from one share
 
 \section{Results}
 
-We trained both SR U-Nets and the segmentation U-Net on simulated low-field data and evaluated on a held-out synthetic set (n~$=$~64, seed~999, disjoint from the training seed). These numbers are a proof of concept on simulated degradation and are not a clinical result.
+We evaluate on real brain MRI. Our data is the brain task of the Medical Segmentation Decathlon~\cite{antonelli2022}, which redistributes BraTS without a registration requirement. We take the contrast-enhanced T1 channel and the middle axial slices of each case. Training and test sets are split \emph{by patient}, never by slice: adjacent axial slices of one patient are near-duplicates, so a slice-level split would place near-copies of training images into the test set and report an optimistic score.
 
-\paragraph{Safety on the held-out set.}
-Table~\ref{tab:main} reports the comparison. The tumor-aware objective roughly halves tumor erasure (27.8\% to 15.2\%) and reduces small-lesion erasure from 88.2\% to 70.6\%. Erasure of medium and large lesions drops to zero for the tumor-aware model. Two facts must be stated plainly. This raw row is not a matched-quality comparison, because the tumor-aware PSNR is 6.3~dB lower; the matched-quality claim is the sweep in Table~\ref{tab:curve}. The tumor-aware false-positive rate nearly doubles (0.343 to 0.615), so the model trades some hallucination for less erasure. A clinician should weigh that tradeoff.
+The two runs below differ only in which nested region is treated as the lesion. This is the experiment that matters, because the perception-distortion argument is explicitly about structures small enough that erasing them costs negligible PSNR. Whole Tumor and Enhancing Tumor sit on opposite sides of that condition, covering 10.9\% and 3.5\% of the image respectively.
+
+\paragraph{Enhancing tumor: the objective matters.}
+Table~\ref{tab:main} reports 71 held-out patients and 2,696 lesions. The tumor-aware objective reduces erasure from 50.5\% to 45.0\%, and halves erasure of medium lesions from 8.6\% to 4.1\%. This is a matched-quality comparison in the way the claim requires: Dice is identical to within 0.001 (0.692 against 0.693) and PSNR differs by 0.7~dB, so the safety difference cannot be attributed to one model simply producing sharper images. With 2,696 lesions the standard error of a proportion near 0.5 is approximately 0.010, so a 5.5-point shift is well outside sampling noise. The cost is hallucination: the false positive detection rate rises from 0.324 to 0.436.
 
 \begin{table}[h]
-  \caption{Held-out evaluation (n~$=$~64). PSNR and SSIM are image quality; the remaining rows are safety. Lower erasure and lower false-positive rate are safer.}
+  \caption{Enhancing tumor, held out on 71 unseen patients (664 slices, 2,696 lesions). PSNR, SSIM and Dice are quality; the remaining rows are safety. Lower erasure and lower false positive rate are safer.}
   \label{tab:main}
   \centering
   \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{@{}lcc@{}}
+  \begin{tabular}{@{}lccc@{}}
     \toprule
-    \textbf{Metric} & \textbf{Distortion-optimal} & \textbf{Tumor-aware} \\
+    \textbf{Metric} & \textbf{Low-resolution} & \textbf{Distortion-optimal} & \textbf{Tumor-aware} \\
     \midrule
-    PSNR (dB)                 & 26.23 & 19.89 \\
-    SSIM                      & 0.751 & 0.739 \\
-    Dice                      & 0.576 & 0.481 \\
-    Tumor erasure rate        & 27.8\% & \textbf{15.2\%} \\
-    Small-lesion erasure rate & 88.2\% & \textbf{70.6\%} \\
-    False positive rate       & 0.343 & 0.615 \\
-    Uncertainty AUROC         & 0.898 & 0.926 \\
+    PSNR (dB)                  & 21.89 & 25.42 & 24.73 \\
+    Dice                       & 0.628 & 0.692 & 0.693 \\
+    \FNER                      & 57.2\% & 50.5\% & \textbf{45.0\%} \\
+    \quad small lesions        & 74.6\% & 66.7\% & \textbf{59.8\%} \\
+    \quad medium lesions       & 16.4\% & 8.6\%  & \textbf{4.1\%} \\
+    \quad large lesions        & 1.3\%  & 0.4\%  & \textbf{0.2\%} \\
+    False positive rate        & 0.461 & \textbf{0.324} & 0.436 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\paragraph{Quality-safety curve.}
-Table~\ref{tab:curve} sweeps the degradation factor and compares erasure at similar image quality. The tumor-aware model erases fewer lesions at every level tested, and the gap is largest at moderate degradation. This supports the central claim: at matched image quality the standard objective erases small tumors that the tumor-aware objective preserves, so image quality is the wrong target for safe enhancement.
+\paragraph{Whole tumor: the objective does not matter.}
+Repeating the identical pipeline with Whole Tumor as the target gives Table~\ref{tab:curve}. The effect disappears. Erasure is 64.6\% against 63.7\%, a difference under one percentage point across 5,128 lesions, and the tumor-aware model is slightly worse on Dice and clearly worse on hallucination.
 
 \begin{table}[h]
-  \caption{Quality-safety sweep. Tumor erasure rate at matched degradation severity. The tumor-aware model is lower at every level.}
+  \caption{Whole tumor, held out on 92 unseen patients (1,074 slices, 5,128 lesions). The lesion-weighted objective produces no safety benefit for a region covering 10.9\% of the image.}
   \label{tab:curve}
   \centering
   \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{@{}lcc@{}}
+  \begin{tabular}{@{}lccc@{}}
     \toprule
-    \textbf{Degradation factor} & \textbf{Distortion erasure} & \textbf{Tumor-aware erasure} \\
+    \textbf{Metric} & \textbf{Low-resolution} & \textbf{Distortion-optimal} & \textbf{Tumor-aware} \\
     \midrule
-    $\times 3$ & 13.5\% & \textbf{1.9\%} \\
-    $\times 4$ & 25.0\% & \textbf{9.6\%} \\
-    $\times 5$ & 28.8\% & \textbf{23.1\%} \\
+    PSNR (dB)     & 21.58 & 25.10 & 24.32 \\
+    Dice          & 0.565 & 0.637 & 0.622 \\
+    \FNER         & 61.5\% & 64.6\% & 63.7\% \\
+    False positive rate & 0.711 & 0.482 & 0.596 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-% TODO: add Figure with quality_safety_curve.png once regenerated from the trained checkpoint.
-% \begin{figure}[h]\centering\includegraphics[width=\linewidth]{quality_safety_curve.png}
-% \caption{Tumor erasure rate versus image quality (PSNR). The tumor-aware curve sits below the distortion curve.}\label{fig:curve}\end{figure}
+\paragraph{The contrast between the two tables is the finding.}
+Lesion weighting works for Enhancing Tumor and does nothing for Whole Tumor. This is what the perception-distortion argument predicts rather than a failure to replicate. The training objective is misaligned with safety only when the structure is small enough that removing it costs negligible reconstruction error. A region covering a ninth of the image already carries enough weight in the pixel loss that the standard objective protects it, so there is nothing for a lesion-weighted term to correct. The size dependence is therefore evidence for the mechanism, not a caveat on it, and it also tells a practitioner where the fix is worth applying.
+
+Table~\ref{tab:curve} carries a second result. For Whole Tumor, both \SR models erase \emph{more} lesions than the degraded input they were given (64.6\% and 63.7\% against 61.5\%), while improving PSNR by more than 3~dB and Dice by 0.07. Enhancement that measurably improves every image-quality score can simultaneously make the clinical finding harder to detect. That is the paper's thesis in its strongest form, and it holds against our own proposed fix as well as against the baseline.
 
 \paragraph{Uncertainty.}
-The MC dropout uncertainty map is predictive of error, with an Area Under the Receiver Operating Characteristic (AUROC) near 0.9 for both models (0.898 and 0.926). High uncertainty coincides with residual error, which makes the map a useful complementary flag for a reviewing clinician. Inference runs on CPU, which supports deployment in low-resource settings.
+The MC dropout uncertainty map remains predictive of reconstruction error on real data, with an Area Under the Receiver Operating Characteristic (AUROC) of 0.846 for the distortion-optimal model and 0.819 for the tumor-aware model. High uncertainty coincides with residual error, which makes the map a useful complementary flag for a reviewing clinician. Inference runs on CPU, which supports deployment in low-resource settings.
+
+\paragraph{Why we do not report the synthetic phantom as a result.}
+An earlier version of this study used procedurally generated slices, and on that data the tumor-aware objective appeared far stronger, reducing erasure from 16.3\% to 5.0\%. That result does not survive contact with real anatomy. Probing the generator explains why: it assigns every tumor pixel the constant intensity 0.95, and a fixed threshold recovers the lesion at Dice 0.878, against 0.233 for the best fixed threshold on real scans. Over half of all pixels are identical across samples because the synthetic skull never moves. On such data, ``erasure'' measures only whether the network preserved a constant peak intensity. We report this because the discrepancy is large enough to mislead, and phantom evaluation is common in this literature.
 
 \section{Discussion and limitations}
 

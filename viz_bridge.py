@@ -21,6 +21,8 @@ No download or GPU required; run ``python viz_bridge.py`` for a quick summary.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import torch
 
@@ -30,7 +32,25 @@ from src.metrics import to_mask_np
 from src.uncertainty import mc_predict
 from viz import PatientVolume, VolumeAnalyzer
 
-CKPT = "checkpoints/demo.pt"
+CKPT = os.environ.get("ACVSS_CKPT", "checkpoints/demo.pt")
+
+# A real held-out case, if one has been fetched. When present the 3D scene shows
+# actual anatomy from a patient the models never saw, instead of the phantom.
+REAL_VOLUME = os.environ.get("ACVSS_VOLUME", "data/real_case.npz")
+
+
+def load_real_volume(path: str = ""):
+    """Return (volume, mask) for a real case, or None if none is available.
+
+    The array is (D, H, W) in [0, 1] with a binary lesion mask, matching what
+    make_phantom_3d produces, so the rest of the pipeline does not care which
+    one it is given.
+    """
+    path = path or REAL_VOLUME
+    if not os.path.exists(path):
+        return None
+    d = np.load(path)
+    return d["vol"].astype(np.float32), d["mask"].astype(np.uint8)
 
 # Tumor placement as (fz, fy, fx, radius_voxels): a spread of sizes so lesion
 # erasure is visible -- the small ones are the ones a distortion model drops.
@@ -141,7 +161,13 @@ def build_patient_volumes(spacing=(1.0, 1.0, 1.0), device="cpu", seed=7):
     factor = int(meta.get("factor", 4))
     sigma = float(meta.get("sigma", 0.03))
 
-    vol, gt_mask = make_phantom_3d(size=size, depth=size, seed=seed)
+    real = load_real_volume()
+    if real is not None:
+        vol, gt_mask = real
+        print(f"3D scene: REAL held-out case, volume {vol.shape}")
+    else:
+        vol, gt_mask = make_phantom_3d(size=size, depth=size, seed=seed)
+        print(f"3D scene: synthetic phantom (no {REAL_VOLUME}), volume {vol.shape}")
     res = run_pipeline_3d(vol, gt_mask, seg, sr_d, sr_t, factor, sigma,
                           device=device, seed=seed)
 
