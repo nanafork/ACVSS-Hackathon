@@ -25,13 +25,13 @@ seen. Dropout is restored to eval mode after every MC block: leaving it on was
 the bug that corrupted the earlier published safety numbers.
 """
 import sys, json, os
-sys.path.insert(0, ROOT)
 import os
 ROOT = os.environ.get("TRUSTMRI_ROOT", os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 ASSETS = os.path.join(ROOT, "safety", "assets")
 CACHE = os.path.join(ASSETS, "data", "et_full.npz")
 CKPT = os.path.join(ASSETS, "shared", "sh_w40_sl0.0.pt")
+sys.path.insert(0, ROOT)
 
 import numpy as np, torch
 

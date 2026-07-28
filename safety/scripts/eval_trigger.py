@@ -19,13 +19,13 @@ acquired-scan segmentation never found cannot be flagged), because that is the
 honest ceiling of this design.
 """
 import sys, json
-sys.path.insert(0, ROOT)
 import os
 ROOT = os.environ.get("TRUSTMRI_ROOT", os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 ASSETS = os.path.join(ROOT, "safety", "assets")
 CACHE = os.path.join(ASSETS, "data", "et_full.npz")
 CKPT = os.path.join(ASSETS, "shared", "sh_w40_sl0.0.pt")
+sys.path.insert(0, ROOT)
 
 import numpy as np
 
