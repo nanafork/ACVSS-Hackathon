@@ -168,6 +168,15 @@ def build_patient_volumes(spacing=(1.0, 1.0, 1.0), device="cpu", seed=7):
     else:
         vol, gt_mask = make_phantom_3d(size=size, depth=size, seed=seed)
         print(f"3D scene: synthetic phantom (no {REAL_VOLUME}), volume {vol.shape}")
+
+    # Surround the volume with empty space before anything is meshed. A real
+    # case is a crop out of a larger head, so tissue runs right up to the array
+    # boundary; marching cubes then leaves the surface open there and renders
+    # the cut as a large flat sheet across the scene. A few voxels of zeros give
+    # the isosurface somewhere to close.
+    pad = 4
+    vol = np.pad(vol, pad, mode="constant")
+    gt_mask = np.pad(gt_mask, pad, mode="constant")
     res = run_pipeline_3d(vol, gt_mask, seg, sr_d, sr_t, factor, sigma,
                           device=device, seed=seed)
 

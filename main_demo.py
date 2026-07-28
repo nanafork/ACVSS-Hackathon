@@ -29,7 +29,8 @@ import base64
 
 import torch
 
-from demo import _ensure_models, _infer, _slice_stats, _fig_to_b64
+from demo import (SLICE_CACHE, _ensure_models, _fig_to_b64, _infer,
+                  _slice_stats)
 from render_3d import (render_compare_png, render_rotate_gif,
                        render_uncertainty_png)
 from src.data import make_dataset
@@ -134,7 +135,9 @@ PAGE = """<!doctype html>
   .vital.safe .v{{color:var(--safe)}} .vital.erased .v{{color:var(--erased)}}
   .dot{{display:inline-block; width:.5em; height:.5em; border-radius:50%; margin-right:.5em}}
 
-  .panels{{display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:1.2rem}}
+  /* 2x2 rather than 1x4: at four across, each brain was ~240px and the
+     difference between a preserved and an erased lesion stopped being legible. */
+  .panels{{display:grid; grid-template-columns:repeat(2,1fr); gap:1.1rem; margin-top:1.2rem}}
   figure{{margin:0; border:1px solid var(--border); border-radius:14px; overflow:hidden;
     background:var(--card)}}
   figure img{{display:block; width:100%; height:auto; background:var(--navy)}}
@@ -181,7 +184,6 @@ PAGE = """<!doctype html>
   code{{font-family:var(--mono); background:var(--card-2); padding:1px 6px;
     border-radius:5px; font-size:.85em}}
 
-  @media(max-width:900px){{.panels{{grid-template-columns:repeat(2,1fr)}}}}
   @media(max-width:760px){{.vitals,.panels,.steps{{grid-template-columns:1fr}}
     .rotate{{grid-template-columns:1fr}}}}
 </style></head>
@@ -201,26 +203,25 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
-    <div class="tag">The measured result</div>
-    <h2>At matched image quality, the tumor-aware objective erases a third fewer lesions.</h2>
+    <div class="tag">The measured result &middot; real BraTS, 71 unseen patients</div>
+    <h2>At equal segmentation quality, the tumor-aware objective erases fewer enhancing lesions.</h2>
     <div class="vitals">
       <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Distortion-optimal SR</div>
-        <div class="v">25.3<span class="u">%</span></div>
-        <div class="d">of real lesions erased (held-out, n&nbsp;=&nbsp;64)</div></div>
+        <div class="v">50.5<span class="u">%</span></div>
+        <div class="d">of enhancing lesions erased (2,696 lesions)</div></div>
       <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Tumor-aware SR</div>
-        <div class="v">17.7<span class="u">%</span></div>
-        <div class="d">erased, at the same image quality</div></div>
+        <div class="v">45.0<span class="u">%</span></div>
+        <div class="d">erased, at the same Dice</div></div>
       <div class="vital"><div class="k"><span class="dot" style="background:var(--accent)"></span>Quality gap</div>
-        <div class="v" style="color:var(--accent-deep)">0.5<span class="u">dB</span></div>
-        <div class="d">PSNR 23.5 vs 23.0, so sharpness does not explain the difference</div></div>
+        <div class="v" style="color:var(--accent-deep)">0.001</div>
+        <div class="d">Dice 0.692 vs 0.693, so sharpness cannot explain the difference</div></div>
     </div>
-    <p class="note">Small lesions are where it matters: erasure falls from 61.9% to 47.6% for
-    small lesions and from 9.8% to 2.4% for large ones. Segmentation Dice rises from 0.47 to
-    0.65. The false-positive rate is essentially unchanged (0.565 against 0.564), so on this
-    checkpoint the safety gain does not come at the cost of extra hallucination. Because PSNR
-    and SSIM are nearly equal between the two models, the difference is attributable to the
-    training objective rather than to how sharp the output looks. True HR is the original
-    high-resolution scan; we degrade it to imitate a cheap low-field scanner.</p>
+    <p class="note">Real brain MRI from the Medical Segmentation Decathlon (BraTS), split
+    <b>by patient</b> so no slice of a test case was ever trained on. Medium-lesion erasure
+    halves, 8.6% to 4.1%. With 2,696 lesions the standard error near p&nbsp;=&nbsp;0.5 is about
+    0.010, so a 5.5-point shift is well outside noise. The cost is hallucination: the false
+    positive rate rises from 0.324 to 0.436. True HR is the original high-resolution scan; we
+    degrade it to imitate a cheap low-field scanner.</p>
   </section>
 
   <section class="slide">
@@ -235,8 +236,10 @@ PAGE = """<!doctype html>
       <figcaption><b>Distortion-optimal.</b> Small lesions dropped.</figcaption></figure>
     {unc_panel}
     </div>
-    <p class="note">A blue ghost with no fill inside it is a lesion the model lost.
-    Configuration: {size}&times;{size} slices, k-space factor {factor}, Rician &sigma;={sigma}.</p>
+    <p class="note">A blue ghost with no fill inside it is a lesion the model lost. This is
+    one held-out patient, restacked from per-slice predictions. Models were trained on
+    {size}&times;{size} slices with k-space factor {factor} and Rician &sigma;={sigma}; the
+    volume here is rendered at full head width so the surface closes.</p>
   </section>
 
   <section class="slide">
@@ -264,7 +267,7 @@ PAGE = """<!doctype html>
     <div class="tag">How the 3D is built</div>
     <h2>From a 2D model to a 3D readout.</h2>
     <div class="steps">
-      <div class="step"><div class="n">01</div><p>A coherent 3D brain phantom with tumors of varied size.</p></div>
+      <div class="step"><div class="n">01</div><p>A real held-out BraTS case the models never saw during training.</p></div>
       <div class="step"><div class="n">02</div><p>Each axial slice is degraded, super-resolved by both models, then segmented.</p></div>
       <div class="step"><div class="n">03</div><p>Predicted masks are restacked into 3D volumes.</p></div>
       <div class="step"><div class="n">04</div><p>Marching cubes and eye-dome lighting render the meshes.</p></div>
@@ -279,13 +282,19 @@ PAGE = """<!doctype html>
     <div class="tag">What this is not</div>
     <h2>Scope, stated plainly.</h2>
     <div class="scope"><ul>
-      <li><b>Synthetic anatomy.</b> The brain is a phantom, not a patient. No BraTS training
-          has been run yet.</li>
+      <li><b>It only works on small lesions.</b> Repeating the identical pipeline on whole
+          tumor (10.9% of the image, against 3.5% for enhancing tumor) shows no benefit at
+          all: 64.6% vs 63.7% erasure. That is what the theory predicts. The objective is
+          only misaligned when erasing the structure costs negligible PSNR, so there is
+          nothing to fix for a large region.</li>
+      <li><b>Enhancement can make detection worse.</b> On whole tumor, both SR models erase
+          more than the raw low-res input (64.6% and 63.7% vs 61.5%) while improving PSNR by
+          3&nbsp;dB. Better image quality, worse finding.</li>
       <li><b>Simulated degradation.</b> It reproduces resolution loss and noise, but not the
-          contrast change of a genuinely low-field scanner.</li>
-      <li><b>Hallucination is still high for both.</b> The false-positive detection rate is
-          about 0.56 for each objective. The tumor-aware model does not make it worse, but
-          neither model solves it.</li>
+          contrast change of a genuinely low-field scanner. We degrade real high-field scans;
+          we have not tested a real low-field acquisition.</li>
+      <li><b>The fix costs hallucination.</b> False positive rate rises from 0.324 to 0.436.
+          Which error a clinic can tolerate is a clinical decision, not ours.</li>
       <li><b>Uncertainty is a reliability signal, not a tumor detector.</b> It runs about
           1.5&times; higher inside the lesion than in healthy tissue here, which is
           suggestive rather than diagnostic.</li>
@@ -366,6 +375,19 @@ PAGE = """<!doctype html>
 </body></html>"""
 
 
+def _test_set(size, pool):
+    """Held-out slices: real patients when the cache is present, else phantom.
+
+    The real split is by patient, so these are cases neither the segmenter nor
+    either SR model has seen.
+    """
+    import os
+    if os.path.exists(SLICE_CACHE):
+        ds = make_dataset("cached", path=SLICE_CACHE, split="test")
+        return torch.utils.data.Subset(ds, range(min(pool, len(ds))))
+    return make_dataset("synthetic", n=pool, size=size, seed=999)
+
+
 def _pick_slices(seg, sr_d, sr_t, size, factor, sigma, device, n_slices, pool=64):
     """Choose the test slices that actually demonstrate the phenomenon.
 
@@ -377,7 +399,7 @@ def _pick_slices(seg, sr_d, sr_t, size, factor, sigma, device, n_slices, pool=64
     the basis of the result; the ordering is presentational only, and the
     aggregate rates on the opening slide come from the full held-out set.
     """
-    ds = make_dataset("synthetic", n=pool, size=size, seed=999)
+    ds = _test_set(size, pool)
     scored = []
     for i in range(len(ds)):
         s = ds[i]

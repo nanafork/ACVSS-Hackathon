@@ -57,7 +57,7 @@ def _add_tumor(p, mesh, color, opacity=1.0, style="surface"):
     return False
 
 
-def _render_one(m, pred_mesh, pred_color, out, size=(580, 560)):
+def _render_one(m, pred_mesh, pred_color, out, size=(820, 780), zoom=1.05):
     """Render a single glass-brain scene with one predicted tumor + true ghost.
 
     No text is baked into the image. Labels live in the HTML so they use the
@@ -78,7 +78,7 @@ def _render_one(m, pred_mesh, pred_color, out, size=(580, 560)):
     except Exception:
         pass
     p.camera_position = "iso"
-    p.camera.zoom(1.5)  # fill the frame so the panel is not mostly empty margin
+    p.camera.zoom(zoom)  # fill the frame without clipping the head
     p.screenshot(out)
     p.close()
     return out
@@ -98,7 +98,7 @@ def render_compare_png(patients, vols, prefix="brain3d"):
 
 
 def render_uncertainty_png(patients, out="brain3d_uncertainty.png",
-                           size=(580, 560), floor=0.35, pct=99.5, iso=0.12):
+                           size=(820, 780), floor=0.35, pct=99.5, iso=0.12):
     """Volume-render the tumor-aware MC dropout uncertainty inside the brain.
 
     The scalar field is normalized per case, so the image shows *where* the
@@ -154,7 +154,7 @@ def render_uncertainty_png(patients, out="brain3d_uncertainty.png",
     p.add_volume(grid, scalars="uncertainty", cmap=uncertainty_cmap(on_dark=True),
                  opacity=(ramp * 255).astype(np.uint8), show_scalar_bar=False)
     p.camera_position = "iso"
-    p.camera.zoom(1.5)
+    p.camera.zoom(1.05)
     p.screenshot(out)
     p.close()
     return out
@@ -178,7 +178,7 @@ def render_rotate_gif(patients, vols, out="brain3d_rotate.gif",
     except Exception:
         pass
     p.camera_position = "iso"
-    p.camera.zoom(1.3)  # fill the frame while leaving room for the orbit
+    p.camera.zoom(1.0)  # leave room for the orbit; a real head is wider than the phantom
     p.show(auto_close=False)
 
     frames = []
