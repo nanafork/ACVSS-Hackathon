@@ -1,0 +1,8 @@
+{
+ "note": "segmenter run on the TRUE HR scan: its own detection floor",
+ "split": "val",
+ "n_patients": 70,
+ "n_lesion_records": 9490,
+ "pooled_erasure_on_true_hr": 0.4756585879873551,
+ "mean_per_patient_erasure_on_true_hr": 0.4554881399033107
+}

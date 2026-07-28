@@ -206,16 +206,22 @@ PAGE = """<!doctype html>
     <div class="tag">Validation result &middot; real BraTS, 70 unseen patients</div>
     <h2>At equal segmentation quality, the tumor-aware objective erases fewer enhancing lesions.</h2>
     <div class="vitals">
-      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Distortion-optimal SR</div>
-        <div class="v">54.6<span class="u">%</span></div>
-        <div class="d">mean per-patient erasure of enhancing lesions</div></div>
-      <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Tumor-aware SR</div>
-        <div class="v">48.1<span class="u">%</span></div>
-        <div class="d">&minus;6.5 points, 95% CI [5.2, 8.2], p&nbsp;&lt;&nbsp;0.0001</div></div>
+      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Erasure caused by distortion-optimal SR</div>
+        <div class="v">+9.1<span class="u">pp</span></div>
+        <div class="d">above the segmenter's own floor of 45.5%</div></div>
+      <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Erasure caused by tumor-aware SR</div>
+        <div class="v">+2.6<span class="u">pp</span></div>
+        <div class="d">removes <b>71%</b> of the damage super-resolution does</div></div>
       <div class="vital"><div class="k"><span class="dot" style="background:var(--accent)"></span>Patients helped</div>
         <div class="v" style="color:var(--accent-deep)">66<span class="u">/70</span></div>
-        <div class="d">1 worse, 3 unchanged. Dice also higher, 0.675 vs 0.660</div></div>
+        <div class="d">1 worse, 3 unchanged; p&nbsp;&lt;&nbsp;0.0001, 95% CI [5.2, 8.2] pp</div></div>
     </div>
+    <p class="note"><b>Why it is quoted this way.</b> Handed the original scan, with no
+    degradation and no reconstruction, the frozen segmenter already misses <b>45.5%</b> of
+    enhancing lesion components. That is the instrument, not the enhancement. Absolute rates
+    of 54.6% and 48.1% therefore mostly measure the segmenter; the number attributable to
+    super-resolution is the excess above that floor, and the tumor-aware objective removes
+    71% of it.</p>
     <p class="note"><b>These are validation numbers, not the final test result.</b> Three loss
     configurations are being compared on the validation split; the winner will be evaluated
     once on 94 held-out test patients, and that single number is the one to quote. Reporting
@@ -305,8 +311,13 @@ PAGE = """<!doctype html>
           Which error a clinic can tolerate is a clinical decision, not ours.</li>
       <li><b>Numbers on this deck are validation, not test.</b> The final figure comes from
           one evaluation of one configuration on 94 patients never used for any decision.</li>
-      <li><b>Both objectives still miss about half of enhancing lesions</b> (51% and 58%
-          erased). This reduces a failure; it does not solve it.</li>
+      <li><b>The segmenter is the weakest link, not the enhancement.</b> It misses 45.5% of
+          enhancing lesion components on the untouched original scan. A stronger downstream
+          model would matter more than a better loss, and every erasure rate here has to be
+          read against that floor.</li>
+      <li><b>Lesion components fragment.</b> An enhancing rim breaks into many small
+          4-connected pieces, so component counts run high and each counts equally. That
+          inflates absolute rates and is part of why the floor is so large.</li>
       <li><b>Uncertainty is a reliability signal, not a tumor detector.</b> It runs about
           1.5&times; higher inside the lesion than in healthy tissue here, which is
           suggestive rather than diagnostic.</li>
@@ -457,12 +468,34 @@ def _slice_blocks(device, n_slices):
         else:
             verdict = "Both objectives recover the same lesions on this slice."
 
-        body = "".join(
-            f"<tr><td>{k}</td><td class=num>{v['psnr']:.1f}</td>"
-            f"<td class=num>{v['ssim']:.3f}</td><td class=num>{v['dice']:.3f}</td>"
-            f"<td class=num>{v['erased']}/{v['lesions']}</td>"
-            f"<td class=num>{v['fabricated']}</td></tr>"
-            for k, v in rows.items())
+        # Order the rows so the comparison is unambiguous: the reference and the
+        # segmenter's floor first, then the input, then the two models. Erasure
+        # is shown both absolutely and as excess over the floor, because the
+        # floor is large and an absolute rate alone blames the enhancement for
+        # lesions the segmenter never finds on any image.
+        order = ["true HR", "low-res", "distortion", "tumor-aware"]
+        floor = rows["true HR"]["erased"]
+        n_les = rows["true HR"]["lesions"]
+        cells = []
+        for k in order:
+            v = rows.get(k)
+            if v is None:
+                continue
+            ref = k == "true HR"
+            q = "&mdash;" if ref else f"{v['psnr']:.1f}"
+            sm = "&mdash;" if ref else f"{v['ssim']:.3f}"
+            excess = v["erased"] - floor
+            exc = ("<b>floor</b>" if ref
+                   else f"{excess:+d}" if excess else "0")
+            label = ("true HR <span style='color:var(--ink-light)'>(reference)</span>"
+                     if ref else k)
+            cells.append(
+                f"<tr><td>{label}</td><td class=num>{q}</td><td class=num>{sm}</td>"
+                f"<td class=num>{v['dice']:.3f}</td>"
+                f"<td class=num>{v['erased']}/{v['lesions']}</td>"
+                f"<td class=num>{exc}</td>"
+                f"<td class=num>{v['fabricated']}</td></tr>")
+        body = "".join(cells)
         blocks.append(f"""
       <section class="slide">
         <div class="tag">2D evidence &middot; {n} of {len(picks)}</div>
@@ -474,11 +507,24 @@ def _slice_blocks(device, n_slices):
           <img src="data:image/png;base64,{cimg}" alt="slice {n} comparison">
           <img src="data:image/png;base64,{uimg}" alt="slice {n} uncertainty and error">
           <table>
-            <tr><th>version</th><th class=num>PSNR</th><th class=num>SSIM</th>
-                <th class=num>Dice</th><th class=num>lesions erased</th>
-                <th class=num>fabricated</th></tr>
+            <tr>
+              <th>image being segmented</th>
+              <th class=num colspan="3">image vs true HR &nbsp;&rarr;</th>
+              <th class=num colspan="3">segmenter output vs true mask &nbsp;&rarr;</th>
+            </tr>
+            <tr><th></th><th class=num>PSNR</th><th class=num>SSIM</th>
+                <th class=num>Dice</th><th class=num>erased</th>
+                <th class=num>vs floor</th><th class=num>fabricated</th></tr>
             {body}
           </table>
+          <p class="note" style="margin-top:.8rem">Each row is a different image handed to
+          the <i>same</i> frozen segmenter. <b>PSNR and SSIM</b> compare that image to the
+          true scan; <b>Dice, erased and fabricated</b> compare the segmenter's output on it
+          to the true tumor mask. The <b>true HR</b> row is the reference, so its image
+          scores are meaningless and omitted &mdash; but its erasure count is not: it is the
+          <b>floor</b>, the {floor} of {n_les} lesions this segmenter misses even on a
+          perfect scan. The <b>vs floor</b> column is the erasure each version <i>adds</i>,
+          and that is the number attributable to degradation and reconstruction.</p>
         </div>
       </section>""")
     return "".join(blocks), size, factor, sigma

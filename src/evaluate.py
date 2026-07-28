@@ -48,8 +48,14 @@ def evaluate_pipeline(sr_models: dict, segmenter, dataset, factor: int = 4,
     for m in sr_models.values():
         m.to(device).eval()
 
-    # Accumulators.
-    names = ["lowres"] + list(sr_models.keys())
+    # Accumulators. "truehr" is the segmenter's own detection floor: what it
+    # misses when handed the original scan with no degradation and no
+    # reconstruction at all. Without that row an erasure rate has no denominator
+    # -- on real BraTS enhancing tumor the floor is around 45%, so quoting a
+    # model at 48% as though it erased 48% of lesions blames the enhancement for
+    # the segmenter's blindness. The number that means something is the excess
+    # over this floor.
+    names = ["truehr", "lowres"] + list(sr_models.keys())
     acc = {n: {"psnr": [], "psnr_brain": [], "ssim": [], "dice": [],
                "records": [], "halluc": [], "auroc": []} for n in names}
 
@@ -61,7 +67,7 @@ def evaluate_pipeline(sr_models: dict, segmenter, dataset, factor: int = 4,
         lr_np = degrade(hr[0, 0].cpu().numpy(), factor=factor, sigma=sigma, rng=rng)
         lr = torch.from_numpy(lr_np)[None, None].to(device)
 
-        versions = {"lowres": lr}
+        versions = {"truehr": hr, "lowres": lr}
         for name, model in sr_models.items():
             with torch.no_grad():
                 versions[name] = model(lr)
@@ -96,14 +102,26 @@ def evaluate_pipeline(sr_models: dict, segmenter, dataset, factor: int = 4,
     for name in names:
         a = acc[name]
         results[name] = {
-            "psnr": float(np.mean(a["psnr"])),
-            "psnr_brain": float(np.nanmean(a["psnr_brain"])),
-            "ssim": float(np.mean(a["ssim"])),
+            # PSNR/SSIM of the reference against itself are degenerate, so they
+            # are reported as NaN rather than as a perfect score. A table showing
+            # "99.0 dB" invites reading the floor row as a model result.
+            "psnr": float("nan") if name == "truehr" else float(np.mean(a["psnr"])),
+            "psnr_brain": (float("nan") if name == "truehr"
+                           else float(np.nanmean(a["psnr_brain"]))),
+            "ssim": float("nan") if name == "truehr" else float(np.mean(a["ssim"])),
             "dice": float(np.mean(a["dice"])),
             "safety": aggregate_safety(a["records"], a["halluc"], edges=size_edges),
             "uncertainty_error_auroc": (float(np.mean(a["auroc"]))
                                         if a["auroc"] else float("nan")),
         }
+
+    # Erasure attributable to the pipeline, i.e. above the segmenter's floor.
+    floor = results["truehr"]["safety"]["false_negative_erasure_rate"]
+    for name, r in results.items():
+        rate = r["safety"]["false_negative_erasure_rate"]
+        r["safety"]["segmenter_floor"] = floor
+        r["safety"]["erasure_above_floor"] = (None if rate is None or floor is None
+                                              else rate - floor)
     return results
 
 
