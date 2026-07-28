@@ -48,42 +48,31 @@
 Read these first. Three are used more narrowly here than in ordinary usage, and every
 confusing number below traces back to one of them.
 
-\begin{center}\small
-\renewcommand{\arraystretch}{1.18}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.55cm}>{\raggedright\arraybackslash}p{12.75cm}@{}}
-\toprule
-\textbf{Lesion} & Clinically an area of abnormal tissue, so for us a tumor: one
-three-dimensional mass a radiologist would put in a report. \textbf{Our metrics mean something
-much narrower} --- one connected blob of tumor mask within a \emph{single 2D slice}. A scan is
-a stack of about 155 cross-sections, so one tumor crossing twenty of them counts as twenty
-lesions, a thin or broken enhancing rim fragments into several more inside each slice, and a
-five-pixel speck counts the same as a whole tumor. \\
-\textbf{Erasure} \newline \emph{(FNER)} & The failure we set out to fix: the reconstruction
-smooths a real tumor away, so the scan looks normal when it is not. Also called
-pseudo-normalization. Computed by taking each lesion in the \emph{true} mask and calling it
-found if the prediction covers at least \textbf{10\%} of it; anything less is erased. The rate
-is erased lesions over true lesions. Lower is safer. \\
-\textbf{Hallucination} \newline \emph{(FPDR)} & The opposite failure: the reconstruction
-invents tumor where there is none. Computed by taking each blob the model \emph{predicts} and
-calling it fabricated if less than \textbf{10\%} of that blob sits inside real tumor. The rate
-is fabricated blobs over predicted blobs. Lower is safer, and it tends to move against
-erasure. \\
-\textbf{Floor} & What the tumor detector misses when handed the \emph{untouched original scan},
-with no degradation or reconstruction involved. It is large, so it is the denominator every
-erasure rate must be read against. \\
-\textbf{Baseline \newline vs ours} & \emph{Distortion-optimal} is the standard approach and our
-baseline, trained only to minimise average pixel error. \emph{Tumor-aware} is ours: same
-network and data, with errors inside the tumor weighted far more heavily. \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\vspace{-0.2em}
-{\small\itshape Both rates are measured from opposite directions on purpose: erasure asks how
-much of the real tumor we found, hallucination asks how much of what we reported was real. The
-10\% bar is generous, so erasure would look worse under a stricter rule. Both are counted per
-blob per 2D slice, so one tumor contributes many records --- which is why we report per-patient
-figures.}
+\begin{itemize}\small
+  \item \textbf{A lesion is} an area of abnormal tissue, so for us a tumor: one
+        three-dimensional mass a radiologist would put in a report. \textbf{In our metrics a
+        lesion is} something much narrower --- one connected blob of tumor mask within a
+        \emph{single 2D slice}. A scan is a stack of about 155 cross-sections, so one tumor
+        crossing twenty of them counts as twenty lesions, a thin or broken enhancing rim
+        fragments into several more inside each slice, and a five-pixel speck counts the same
+        as a whole tumor.
+  \item \textbf{Erasure is} the failure we set out to fix: the reconstruction smooths a real
+        tumor away, so the scan looks normal when it is not. It is also called
+        pseudo-normalization. \textbf{The erasure rate is} the number of true lesions the
+        model failed to recover, divided by the number of true lesions, where a lesion counts
+        as recovered if the prediction covers at least 10\% of it. Lower is safer.
+  \item \textbf{Hallucination is} the opposite failure: the reconstruction invents tumor where
+        there is none. \textbf{The hallucination rate is} the number of predicted blobs that
+        are fabricated, divided by the number of predicted blobs, where a blob counts as
+        fabricated if less than 10\% of it sits inside real tumor. Lower is safer, and it tends
+        to move against erasure.
+  \item \textbf{The floor is} what the tumor detector misses when handed the untouched original
+        scan, with no degradation or reconstruction involved. It is large, so it is the
+        denominator every erasure rate must be read against.
+  \item \textbf{The baseline is} the distortion-optimal model: the standard approach, trained
+        only to minimise average pixel error. \textbf{Ours is} the tumor-aware model: the same
+        network and the same data, with errors inside the tumor weighted far more heavily.
+\end{itemize}
 
 \vspace{0.3em}
 \thinrule
