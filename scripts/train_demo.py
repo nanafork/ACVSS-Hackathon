@@ -40,11 +40,13 @@ def main():
                     help="which cached split to train on")
     ap.add_argument("--seg-lambda", type=float, default=0.0,
                     help="weight on the segmentation-consistency term; 0 disables it")
+    ap.add_argument("--seed", type=int, default=0,
+                    help="torch seed. Every run so far used 0, so we have no\n                         estimate of run-to-run variance; vary it to get one.")
     ap.add_argument("--out", default="checkpoints/demo.pt")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    torch.manual_seed(0)
+    torch.manual_seed(args.seed)
 
     if args.cached:
         train_ds = make_dataset("cached", path=args.cached, split=args.split)
@@ -84,7 +86,8 @@ def main():
                 meta={"size": args.size, "factor": args.factor, "sigma": args.sigma,
                       "kind": kind, "source": args.cached or args.root or "procedural",
                       "weight": args.weight, "seg_lambda": args.seg_lambda,
-                      "sr_epochs": args.sr_epochs})
+                      "sr_epochs": args.sr_epochs,
+                      "seed": args.seed})
     print("saved", args.out)
 
 

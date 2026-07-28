@@ -50,8 +50,8 @@ def evaluate_pipeline(sr_models: dict, segmenter, dataset, factor: int = 4,
 
     # Accumulators.
     names = ["lowres"] + list(sr_models.keys())
-    acc = {n: {"psnr": [], "ssim": [], "dice": [], "records": [], "halluc": [],
-               "auroc": []} for n in names}
+    acc = {n: {"psnr": [], "psnr_brain": [], "ssim": [], "dice": [],
+               "records": [], "halluc": [], "auroc": []} for n in names}
 
     for idx in range(len(dataset)):
         sample = dataset[idx]
@@ -66,8 +66,11 @@ def evaluate_pipeline(sr_models: dict, segmenter, dataset, factor: int = 4,
             with torch.no_grad():
                 versions[name] = model(lr)
 
+        # Brain mask from the reference scan: anything above the background floor.
+        brain = (hr > 0.05)
         for name, img in versions.items():
             acc[name]["psnr"].append(psnr(img, hr))
+            acc[name]["psnr_brain"].append(psnr(img, hr, mask=brain))
             acc[name]["ssim"].append(ssim(img, hr))
             pred_mask = _seg_mask(segmenter, img)
             acc[name]["dice"].append(dice(pred_mask, gt))
@@ -94,6 +97,7 @@ def evaluate_pipeline(sr_models: dict, segmenter, dataset, factor: int = 4,
         a = acc[name]
         results[name] = {
             "psnr": float(np.mean(a["psnr"])),
+            "psnr_brain": float(np.nanmean(a["psnr_brain"])),
             "ssim": float(np.mean(a["ssim"])),
             "dice": float(np.mean(a["dice"])),
             "safety": aggregate_safety(a["records"], a["halluc"], edges=size_edges),

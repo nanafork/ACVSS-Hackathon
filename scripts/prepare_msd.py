@@ -99,13 +99,17 @@ def main():
             z0 = max(0, min(centre - half, depth - args.slices_per_case))
             z1 = min(depth, z0 + args.slices_per_case)
             for z in range(z0, z1):
-                m = to_mask(seg[:, :, z])
+                # Crop first, then filter. The check used to run on the full
+                # 240x240 slice, so a lesion near the edge passed it and was
+                # then cropped away, leaving a training pair whose label says
+                # there is no tumor. That silently mislabelled 0.6% of slices.
+                m = center_crop(to_mask(seg[:, :, z]), args.size)
                 if m.sum() < args.min_tumor_pixels:
                     continue
                 # dataobj slicing avoids decoding the whole 4-D volume.
                 img = np.asarray(vol[:, :, z, ch], dtype=np.float32)
                 hrs.append(center_crop(_norm01(img), args.size).astype(np.float16))
-                masks.append(center_crop(m, args.size).astype(np.uint8))
+                masks.append(m.astype(np.uint8))
                 case_ids.append(n)
         except Exception as e:
             print(f"  skip {name}: {type(e).__name__} {e}")

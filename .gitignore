@@ -24,3 +24,4 @@ env/
 # large data caches (regenerate with scripts/prepare_msd.py)
 data/*.npz
 !data/real_case.npz
+data/msd/
