@@ -116,27 +116,22 @@ each slice, and a five-pixel speck counts the same as a whole tumor. This is why
 large, why rates look alarming, and why lesions cannot be treated as independent samples. \\
 \textbf{Erasure} \newline \emph{False Negative Erasure Rate} & The failure we set out to
 fix: the reconstruction smooths a real tumor away, so the scan looks normal when it is not.
-Also called pseudo-normalization. Precisely: let $G$ be the set of connected components of the
-\emph{true} tumor mask and $P$ the predicted mask. A component $g \in G$ counts as
-\textbf{detected} when the prediction covers at least a fraction $\tau$ of it,
-\[ \frac{|g \cap P|}{|g|} \;\ge\; \tau, \qquad \tau = 0.1, \]
-and as \textbf{erased} otherwise. Then
-$\mathrm{FNER} = \bigl|\{g \in G : g \text{ erased}\}\bigr| \,/\, |G|$. Lower is safer. \\
+Also called pseudo-normalization. What we actually compute: take each lesion in the
+\emph{true} mask, and call it \textbf{found} if the model's prediction covers at least
+\textbf{10\%} of it. Anything less counts as \textbf{erased}. The rate is the number of erased
+lesions divided by the number of true lesions. Lower is safer. \\
 \textbf{Hallucination} \newline \emph{False Positive Detection Rate} & The opposite failure:
-the reconstruction invents tumor where there is none. Let $C$ be the set of connected
-components of the \emph{predicted} mask and $T$ the true mask. A component $c \in C$ counts as
-\textbf{fabricated} when less than a fraction $\tau$ of \emph{it} lies inside true tumor,
-\[ \frac{|c \cap T|}{|c|} \;<\; \tau, \qquad \tau = 0.1, \]
-and then
-$\mathrm{FPDR} = \bigl|\{c \in C : c \text{ fabricated}\}\bigr| \,/\, |C|$. Lower is safer, and
-it tends to move in the opposite direction to erasure. \\
-\multicolumn{2}{@{}p{15.3cm}@{}}{\small\itshape Two properties of these definitions are worth
-knowing before quoting them. They are normalised differently and deliberately so: erasure
-divides overlap by the size of the \emph{true} lesion (did we find what was there?), while
-hallucination divides by the size of the \emph{predicted} blob (is what we reported real?).
-And $\tau = 0.1$ is lenient: recovering a tenth of a lesion counts as finding it, so erasure
-would look worse under a stricter threshold. Both rates are computed per component per 2D
-slice, so a single tumor contributes many records.} \\
+the reconstruction invents tumor where there is none. What we actually compute: take each blob
+the model \emph{predicts}, and call it \textbf{fabricated} if less than \textbf{10\%} of that
+blob sits inside real tumor. The rate is the number of fabricated blobs divided by the number
+of predicted blobs. Lower is safer, and it tends to move in the opposite direction to
+erasure. \\
+\multicolumn{2}{@{}p{15.3cm}@{}}{\small\itshape Three things to know before quoting either
+rate. The two are measured from opposite directions on purpose: erasure asks ``how much of the
+real tumor did we find?'', hallucination asks ``how much of what we reported was real?''. The
+10\% bar is generous, so recovering a tenth of a lesion counts as finding it and erasure would
+look worse under a stricter rule. And both are counted per blob per 2D slice, so one tumor
+contributes many separate records.} \\
 \textbf{Floor} & What the downstream segmenter misses when handed the \emph{untouched original
 scan}, with no degradation and no reconstruction involved. It is large, so it is the
 denominator every erasure rate has to be read against. \\
