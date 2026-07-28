@@ -135,6 +135,44 @@ PAGE = """<!doctype html>
   .vital.safe .v{{color:var(--safe)}} .vital.erased .v{{color:var(--erased)}}
   .dot{{display:inline-block; width:.5em; height:.5em; border-radius:50%; margin-right:.5em}}
 
+  /* Stacked bars separating the segmenter's own blind spot from the erasure our
+     pipeline adds. Stacked rather than side-by-side on purpose: the point is
+     that the two parts are not comparable quantities and only the second is
+     ours to fix. Grey is deliberately not one of the model hues, because it is
+     a baseline rather than an identity. */
+  .ladder{{margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
+    border-radius:14px; padding:1.2rem 1.3rem}}
+  .lrow{{display:grid; grid-template-columns:15rem 1fr 9rem; gap:1rem;
+    align-items:center; margin-bottom:.75rem}}
+  .llab{{font-size:.84rem; font-weight:600; line-height:1.25}}
+  .llab span{{display:block; font-weight:400; font-size:.74rem; color:var(--ink-light)}}
+  .lbar{{display:flex; height:1.5rem; background:var(--card-2); border-radius:4px;
+    overflow:hidden}}
+  .lbar i{{display:block; height:100%}}
+  .lbar i.floor{{background:#9BA1A6}}
+  /* 2px of surface between stacked segments so the boundary reads as a break
+     rather than a colour transition. */
+  .lbar i.add{{border-left:2px solid var(--card)}}
+  .lbar i.di{{background:var(--erased)}}
+  .lbar i.ta{{background:var(--safe)}}
+  .lnum{{font-family:var(--mono); font-size:1.05rem; text-align:right; line-height:1.2}}
+  .lnum span{{display:block; font-family:var(--font); font-size:.72rem;
+    color:var(--ink-light)}}
+  .lscale{{display:grid; grid-template-columns:15rem 1fr 9rem; gap:1rem;
+    font-family:var(--mono); font-size:.68rem; color:var(--ink-light)}}
+  .lscale span:first-child{{grid-column:2; justify-self:start}}
+  .lscale span:nth-child(2){{grid-column:2; justify-self:center; font-family:var(--font)}}
+  .lscale span:last-child{{grid-column:2; justify-self:end}}
+  .lkey{{display:flex; flex-direction:column; gap:.4rem; margin-top:1rem;
+    padding-top:.9rem; border-top:1px solid var(--border);
+    font-size:.78rem; color:var(--ink-mid)}}
+  .sw{{display:inline-block; width:.8rem; height:.8rem; border-radius:3px;
+    margin-right:.4rem; vertical-align:-1px}}
+  .sw.floor{{background:#9BA1A6}} .sw.di{{background:var(--erased)}}
+  .sw.ta{{background:var(--safe); margin-left:-.15rem; margin-right:.5rem}}
+  @media(max-width:760px){{.lrow{{grid-template-columns:1fr; gap:.3rem}}
+    .lnum{{text-align:left}}}}
+
   /* 2x2 rather than 1x4: at four across, each brain was ~240px and the
      difference between a preserved and an erased lesion stopped being legible. */
   .panels{{display:grid; grid-template-columns:repeat(2,1fr); gap:1.1rem; margin-top:1.2rem}}
@@ -206,22 +244,56 @@ PAGE = """<!doctype html>
     <div class="tag">Validation result &middot; real BraTS, 70 unseen patients</div>
     <h2>At equal segmentation quality, the tumor-aware objective erases fewer enhancing lesions.</h2>
     <div class="vitals">
-      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Erasure caused by distortion-optimal SR</div>
+      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Caused by distortion-optimal SR</div>
         <div class="v">+9.1<span class="u">pp</span></div>
         <div class="d">above the segmenter's own floor of 45.5%</div></div>
-      <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Erasure caused by tumor-aware SR</div>
+      <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Caused by tumor-aware SR</div>
         <div class="v">+2.6<span class="u">pp</span></div>
         <div class="d">removes <b>71%</b> of the damage super-resolution does</div></div>
       <div class="vital"><div class="k"><span class="dot" style="background:var(--accent)"></span>Patients helped</div>
         <div class="v" style="color:var(--accent-deep)">66<span class="u">/70</span></div>
         <div class="d">1 worse, 3 unchanged; p&nbsp;&lt;&nbsp;0.0001, 95% CI [5.2, 8.2] pp</div></div>
     </div>
-    <p class="note"><b>Why it is quoted this way.</b> Handed the original scan, with no
-    degradation and no reconstruction, the frozen segmenter already misses <b>45.5%</b> of
-    enhancing lesion components. That is the instrument, not the enhancement. Absolute rates
-    of 54.6% and 48.1% therefore mostly measure the segmenter; the number attributable to
-    super-resolution is the excess above that floor, and the tumor-aware objective removes
-    71% of it.</p>
+    <h3 style="margin-top:2rem">Read this before the numbers above.</h3>
+    <p class="note" style="margin-top:.3rem">We hand the <i>same</i> frozen tumor segmenter
+    three different images and count how many enhancing lesions it fails to find. The first
+    image is the untouched original scan. It is the control, and it is the reason the
+    percentages above are written the way they are.</p>
+
+    <div class="ladder">
+      <div class="lrow">
+        <div class="llab">Untouched original scan<span>the control</span></div>
+        <div class="lbar"><i class="floor" style="width:75.8%"></i></div>
+        <div class="lnum">45.5%<span>missed</span></div>
+      </div>
+      <div class="lrow">
+        <div class="llab">Distortion-optimal SR<span>trained for image quality</span></div>
+        <div class="lbar"><i class="floor" style="width:75.8%"></i><i class="add di" style="width:15.2%"></i></div>
+        <div class="lnum">54.6%<span><b style="color:var(--erased)">+9.1</b> caused by SR</span></div>
+      </div>
+      <div class="lrow">
+        <div class="llab">Tumor-aware SR<span>our objective</span></div>
+        <div class="lbar"><i class="floor" style="width:75.8%"></i><i class="add ta" style="width:4.3%"></i></div>
+        <div class="lnum">48.1%<span><b style="color:var(--safe)">+2.6</b> caused by SR</span></div>
+      </div>
+      <div class="lscale"><span>0%</span><span>of enhancing lesion components missed</span><span>60%</span></div>
+      <div class="lkey">
+        <span><i class="sw floor"></i>missed on the original scan too &mdash; the segmenter's
+        own blind spot, not caused by us</span>
+        <span><i class="sw di"></i><i class="sw ta"></i>additionally missed because the scan
+        was degraded and reconstructed &mdash; <b>this is the part we can fix</b></span>
+      </div>
+    </div>
+
+    <p class="note"><b>So the honest claim is not "48.1% versus 54.6%".</b> Both of those are
+    dominated by the grey bar, which no super-resolution model is responsible for. The part
+    attributable to degrading a scan and reconstructing it is 9.1 points for the standard
+    objective and 2.6 for ours. <b>The tumor-aware objective removes 71% of the erasure that
+    super-resolution itself introduces</b> (9.1 &rarr; 2.6), and that is the number the paper
+    reports.</p>
+    <p class="note">The flip side, stated plainly: because the grey bar is so large, the
+    biggest available win is not a better loss function but a better downstream segmenter.
+    Ours misses nearly half of all enhancing lesion components on a perfect image.</p>
     <p class="note"><b>These are validation numbers, not the final test result.</b> Three loss
     configurations are being compared on the validation split; the winner will be evaluated
     once on 94 held-out test patients, and that single number is the one to quote. Reporting
