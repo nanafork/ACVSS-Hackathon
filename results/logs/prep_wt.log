@@ -1,0 +1,22 @@
+484 cases, modality t1c (channel 2)
+  25/484 cases -> 260 slices
+  50/484 cases -> 534 slices
+  75/484 cases -> 834 slices
+  100/484 cases -> 1124 slices
+  125/484 cases -> 1401 slices
+  150/484 cases -> 1699 slices
+  175/484 cases -> 1963 slices
+  200/484 cases -> 2218 slices
+  225/484 cases -> 2500 slices
+  250/484 cases -> 2776 slices
+  275/484 cases -> 3022 slices
+  300/484 cases -> 3284 slices
+  325/484 cases -> 3542 slices
+  350/484 cases -> 3812 slices
+  375/484 cases -> 4089 slices
+  400/484 cases -> 4365 slices
+  425/484 cases -> 4650 slices
+  450/484 cases -> 4916 slices
+  475/484 cases -> 5172 slices
+wrote /tmp/msd/slices_128.npz: (5259, 128, 128) slices from 460 cases, 10.91% tumor pixels
+

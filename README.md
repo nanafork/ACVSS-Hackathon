@@ -44,14 +44,19 @@ table. It is a **correctness check**, not a scientific result.
 
 ```bash
 python scripts/train_demo.py        # trains + saves checkpoints/demo.pt (synthetic; add --brats --root for real)
-python demo.py                      # writes demo.html (self-contained, open in any browser / share)
+python main_demo.py                 # writes main_demo.html (self-contained, open in any browser / share)
 python demo.py --gradio             # interactive app (needs: pip install gradio)
 ```
 
-`demo.html` shows, per slice: the low-res / distortion / tumor-aware / true
-panel, the predicted tumor masks (cyan = true outline), the uncertainty map, and
-a table with PSNR/SSIM/Dice and **lesions erased** / **fabricated** counts. If no
-checkpoint exists, the demo quick-trains one on synthetic data so it always runs.
+`main_demo.html` is the page we present. It carries the measured safety
+headline, four 3D viewports (ground truth, tumor-aware, distortion-optimal, and
+the MC dropout uncertainty field), a rotating overlay, and the 2D evidence
+underneath it: per-slice low-res / distortion / tumor-aware / true panels, the
+predicted tumor masks (blue outline = true tumor), the uncertainty and error
+maps, and a table with PSNR/SSIM/Dice and **lesions erased** / **fabricated**
+counts. Colors come from `src/palette.py` so the 2D figures and the 3D renders
+label the same model with the same hue. If no checkpoint exists, the demo
+quick-trains one on synthetic data so it always runs.
 
 ## Real run (Kaggle, BraTS)
 

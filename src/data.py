@@ -176,10 +176,73 @@ class BraTSSliceDataset(Dataset):
         return {"hr": hr, "mask": m}
 
 
+class CachedSliceDataset(Dataset):
+    """Pre-extracted real slices from an ``.npz`` written by prepare_msd.py.
+
+    Holds ``hr`` (float16), ``mask`` (uint8) and ``case_id`` (int32) in memory.
+    A few thousand 128x128 slices is well under a gigabyte, and serving them
+    from RAM keeps the GPU fed instead of waiting on nibabel.
+
+    ``split`` divides the data **by case, never by slice**. Adjacent axial
+    slices of one patient are nearly duplicates, so a random slice-level split
+    would put near-copies of a training image in the test set and report an
+    optimistic score. Cases are partitioned on a hash of the case id, so the
+    same case always lands on the same side regardless of load order.
+
+    There are three splits, not two. Any choice made by looking at a score --
+    a loss weight, an epoch count, whether to enable a term -- must be made on
+    ``val``. ``test`` is for the single final number. Sweeping a hyperparameter
+    against the test set and reporting the best value is not an evaluation, and
+    the ``test`` cases here are the ones the headline result is quoted from.
+    """
+
+    def __init__(self, path: str, split: str = "all", test_frac: float = 0.2,
+                 val_frac: float = 0.15):
+        d = np.load(path)
+        hr, mask, case_id = d["hr"], d["mask"], d["case_id"]
+
+        if split != "all":
+            cases = np.unique(case_id)
+            n_test = max(1, int(round(len(cases) * test_frac)))
+            n_val = max(1, int(round(len(cases) * val_frac)))
+            # Deterministic case-level partition, independent of ordering. The
+            # test block is taken first and with the same seed as before, so the
+            # held-out cases behind the published numbers do not move when a
+            # validation split is carved out of the remainder.
+            order = np.argsort([hash((int(c), 20260727)) for c in cases])
+            test_cases = set(cases[order[:n_test]].tolist())
+            val_cases = set(cases[order[n_test:n_test + n_val]].tolist())
+            want = {"test": test_cases, "val": val_cases}.get(split)
+            if want is not None:
+                keep = np.array([int(c) in want for c in case_id])
+            else:  # train: everything that is neither
+                keep = np.array([int(c) not in test_cases and int(c) not in val_cases
+                                 for c in case_id])
+            hr, mask, case_id = hr[keep], mask[keep], case_id[keep]
+
+        self.hr = hr
+        self.mask = mask
+        self.case_id = case_id
+
+    def __len__(self) -> int:
+        return len(self.hr)
+
+    def n_cases(self) -> int:
+        return len(np.unique(self.case_id))
+
+    def __getitem__(self, idx: int):
+        hr = torch.from_numpy(self.hr[idx].astype(np.float32))[None]
+        m = torch.from_numpy(self.mask[idx].astype(np.float32))[None]
+        return {"hr": hr, "mask": m}
+
+
 def make_dataset(kind: str = "synthetic", **kwargs) -> Dataset:
-    """Factory: 'synthetic' (local) or 'brats' (Kaggle real data)."""
+    """Factory: 'synthetic' (local), 'brats' (standard BraTS layout), or
+    'cached' (real slices pre-extracted by scripts/prepare_msd.py)."""
     if kind == "synthetic":
         return SyntheticSliceDataset(**kwargs)
     if kind == "brats":
         return BraTSSliceDataset(**kwargs)
+    if kind == "cached":
+        return CachedSliceDataset(**kwargs)
     raise ValueError(f"unknown dataset kind {kind!r}")

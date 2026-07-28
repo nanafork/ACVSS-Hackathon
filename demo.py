@@ -32,7 +32,13 @@ from src.metrics import (dice, hallucination_stats, lesion_records, psnr,
                          ssim, to_mask_np)
 from src.uncertainty import mc_predict
 
-CKPT = "checkpoints/demo.pt"
+# Default to the real-data checkpoint (enhancing tumor, trained on 368 BraTS
+# patients). Override with ACVSS_CKPT to compare against another run.
+CKPT = os.environ.get("ACVSS_CKPT", "checkpoints/demo_et_v2.pt")
+
+# When this cache is present the 2D panels show real held-out patients rather
+# than the synthetic phantom.
+SLICE_CACHE = os.environ.get("ACVSS_SLICES", "data/slices_et_full.npz")
 
 
 def _ensure_models(device: str):
@@ -72,6 +78,12 @@ def _infer(seg, sr_d, sr_t, hr, factor, sigma, device, seed=0):
         versions = {"low-res": lr, "distortion": sr_d(lr), "tumor-aware": sr_t(lr),
                     "true HR": hr}
     mean, unc = mc_predict(sr_t, lr, passes=15)
+    # mc_predict leaves dropout switched on. Without restoring eval mode, every
+    # later call to this function would super-resolve with dropout active, so
+    # each slice after the first would get a stochastic, degraded tumor-aware
+    # reconstruction and the comparison against the distortion model would be
+    # silently unfair.
+    sr_t.eval()
     return versions, lr, mean, unc
 
 

@@ -16,3 +16,16 @@ __pycache__/
 venv/
 .venv/
 env/
+
+# render outputs and large archives (demo_3d.html embeds them as base64)
+*.png
+*.zip
+
+# large data caches (regenerate with scripts/prepare_msd.py)
+data/*.npz
+!data/real_case.npz
+data/msd/
+
+# sweep checkpoints live on HF (douyeszn/tumor-aware-sr); fetch, do not commit
+checkpoints/ck_*.pt
+checkpoints/sh_*.pt

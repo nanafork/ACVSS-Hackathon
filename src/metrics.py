@@ -23,9 +23,26 @@ import torch.nn.functional as F
 # --------------------------------------------------------------------------- #
 # Image quality
 # --------------------------------------------------------------------------- #
-def psnr(pred: torch.Tensor, target: torch.Tensor, data_range: float = 1.0) -> float:
-    """Peak signal-to-noise ratio (dB). Higher is better."""
-    mse = F.mse_loss(pred, target).item()
+def psnr(pred: torch.Tensor, target: torch.Tensor, data_range: float = 1.0,
+         mask: torch.Tensor | None = None) -> float:
+    """Peak signal-to-noise ratio (dB). Higher is better.
+
+    ``mask`` restricts the error to a region. Without it, PSNR is averaged over
+    the whole frame, and roughly a tenth of a brain slice is empty background
+    that is identical in prediction and target. That free agreement inflates
+    every model's score by the same amount and makes two models look closer in
+    quality than they are, which matters when the whole argument rests on
+    comparing safety *at matched quality*. Prefer a brain-masked PSNR for that
+    comparison; the unmasked value is kept because published numbers use it.
+    """
+    if mask is None:
+        mse = F.mse_loss(pred, target).item()
+    else:
+        m = (mask > 0.5).to(pred.dtype)
+        n = m.sum().item()
+        if n < 1:
+            return float("nan")
+        mse = (((pred - target) ** 2) * m).sum().item() / n
     if mse <= 1e-12:
         return 99.0
     return 10.0 * np.log10((data_range ** 2) / mse)
@@ -44,7 +61,7 @@ def ssim(pred: torch.Tensor, target: torch.Tensor, data_range: float = 1.0,
     """Structural similarity (mean over the image). Expects (B,1,H,W) or (1,H,W)."""
     if pred.dim() == 3:
         pred, target = pred[None], target[None]
-    w = _gaussian_window(win).to(pred.dtype)
+    w = _gaussian_window(win).to(device=pred.device, dtype=pred.dtype)
     pad = win // 2
     mu_x = F.conv2d(pred, w, padding=pad)
     mu_y = F.conv2d(target, w, padding=pad)

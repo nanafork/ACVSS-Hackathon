@@ -1,0 +1,42 @@
+2650 slices from 70 patients (checkpoints/demo_et_v2.pt)
+  100/2650
+  200/2650
+  300/2650
+  400/2650
+  500/2650
+  600/2650
+  700/2650
+  800/2650
+  900/2650
+  1000/2650
+  1100/2650
+  1200/2650
+  1300/2650
+  1400/2650
+  1500/2650
+  1600/2650
+  1700/2650
+  1800/2650
+  1900/2650
+  2000/2650
+  2100/2650
+  2200/2650
+  2300/2650
+  2400/2650
+  2500/2650
+  2600/2650
+
+lesion cross-sections: 9490   patients: 70
+  pooled erasure   distortion 0.5800   tumor-aware 0.5135
+
+--- patient as the unit of analysis ---
+  mean per-patient erasure   distortion 0.5462   tumor-aware 0.4812
+  mean paired difference     +0.0650
+  patients helped 66, hurt 1, unchanged 3
+  95% CI (patient bootstrap) [+0.0515, +0.0816]
+  two-sided bootstrap p      0.0000
+  Wilcoxon signed-rank p     0.0000 (n=67)
+
+  naive SE if lesions were independent: 0.0051
+  actual SE across patients:            0.0078
+  the naive figure is optimistic by ~1.5x

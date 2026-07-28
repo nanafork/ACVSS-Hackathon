@@ -11,13 +11,30 @@ Pipeline: **degrade** a high-res brain scan (k-space truncation + Rician noise) 
 **safety rates** (lesion erasure, hallucination), plus **MC-dropout uncertainty**
 and a **CPU benchmark**.
 
-**How to run on Kaggle**
-1. Add this repository to the notebook (upload as a Dataset, or `git clone`) so
-   that the `src/` package is importable.
-2. Attach a BraTS dataset (e.g. the BraTS2020 subset on Kaggle, no registration).
-3. Set `DATA_ROOT` and `DATA_KIND = "brats"` below. Leave `"synthetic"` to run
+**How to run on Kaggle with a GPU**
+1. New Notebook, then in the right-hand panel set **Accelerator = GPU T4 x2**
+   and **Internet = On**. (GPU requires a phone-verified Kaggle account.)
+2. Run the clone cell below. It pulls the current branch, so you get the same
+   code as the local demo.
+3. **+ Add Input** and search `brats20-dataset-training-validation`, then add
+   it. That mirror needs no registration.
+4. Set `DATA_KIND = "brats"` in the config cell. Leave `"synthetic"` to run
    with no download.
-4. Run all. Turn on the GPU accelerator for faster training."""),
+5. Run All. On a T4 the synthetic run is a few minutes; BraTS is longer.
+
+The last cell saves `checkpoints/demo.pt`. Download it from the notebook's
+Output tab and drop it into `checkpoints/` locally, then `python main_demo.py`
+regenerates the deck from the GPU-trained weights."""),
+
+    ("code", """# Clone the repo so the src/ package is importable. Skip if you added it as
+# a Kaggle Dataset instead. Private repo: use a token, or upload as a Dataset.
+REPO = "https://github.com/nanafork/ACVSS-Hackathon.git"
+BRANCH = "neuro-voxel-3d-viz"
+import os
+if not os.path.isdir("/kaggle/working/ACVSS-Hackathon") and os.path.isdir("/kaggle"):
+    !git clone --depth 1 --branch $BRANCH $REPO /kaggle/working/ACVSS-Hackathon
+    %cd /kaggle/working/ACVSS-Hackathon
+!pip -q install nibabel"""),
 
     ("code", """import sys, os
 # Make the src/ package importable whether the repo is the working dir or added
@@ -40,6 +57,10 @@ print("device:", DEVICE)"""),
     ("md", "## Config"),
     ("code", """DATA_KIND = "synthetic"     # "brats" for real data, "synthetic" for a no-download demo
 DATA_ROOT = "/kaggle/input/brats20-dataset-training-validation/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData"
+# For the African population subset (BraTS-Africa / BraTS-SSA), attach that dataset
+# and point DATA_ROOT at its training folder instead. The pipeline is identical:
+# it takes high-resolution scans and degrades them to imitate a low-field scanner.
+# DATA_ROOT = "/kaggle/input/brats-africa/.../TrainingData"
 SIZE      = 128
 FACTOR    = 4          # k-space truncation (resolution loss)
 SIGMA     = 0.03       # Rician noise level
@@ -94,6 +115,40 @@ uncertainty_figure(lr, mean, unc, hr, save_path="uncertainty.png")"""),
     ("md", "## 5. CPU deployment benchmark"),
     ("code", """b = cpu_benchmark(sr_d, size=SIZE, reps=20)
 print(f"CPU inference: {b['latency_ms']:.1f} ms/slice | params {b['params']:,} | {b['param_memory_mb']:.2f} MB")"""),
+
+    ("md", """## 6. Upload the trained weights to Hugging Face
+
+The person running this notebook pastes their own Hugging Face token. Create one
+with **write** access at https://huggingface.co/settings/tokens. The token is
+read through a hidden prompt and is not stored in the notebook or the repo."""),
+    ("code", """import getpass
+from huggingface_hub import HfApi, login
+from src.checkpoint import save_models
+
+# 1. Save the three trained models to one checkpoint.
+CKPT_PATH = "checkpoints/demo.pt"
+save_models(CKPT_PATH, seg, sr_d, sr_t,
+            meta={"size": SIZE, "factor": FACTOR, "sigma": SIGMA,
+                  "tumor_weight": TUMOR_WEIGHT, "data_kind": DATA_KIND})
+
+# 2. Log in with the token entered at the prompt.
+HF_TOKEN = getpass.getpass("Hugging Face token (write access): ").strip()
+login(token=HF_TOKEN)
+
+# 3. Create the model repo under the account that owns the token and upload.
+api = HfApi()
+username = api.whoami()["name"]
+HF_REPO = f"{username}/tumor-aware-sr-weights"   # rename here if you prefer
+api.create_repo(HF_REPO, repo_type="model", private=True, exist_ok=True)
+api.upload_file(path_or_fileobj=CKPT_PATH, path_in_repo="demo.pt",
+                repo_id=HF_REPO, repo_type="model")
+print(f"Uploaded weights to https://huggingface.co/{HF_REPO}")"""),
+
+    ("md", "### Load the weights back later (for inference or the 3D demo)"),
+    ("code", """# from huggingface_hub import hf_hub_download
+# from src.checkpoint import load_models
+# path = hf_hub_download(HF_REPO, "demo.pt")   # HF_REPO = "<username>/tumor-aware-sr-weights"
+# seg, sr_d, sr_t, meta = load_models(path, device=DEVICE)"""),
 ]
 
 

@@ -1,0 +1,77 @@
+{
+ "checkpoint": "demo_et.pt",
+ "note": "after the dropout-leak fix in evaluate.py",
+ "n_slices": 664,
+ "n_cases": 71,
+ "results": {
+  "lowres": {
+   "psnr": 21.89097725111484,
+   "ssim": 0.5447159781154379,
+   "dice": 0.6278258364360894,
+   "safety": {
+    "n_lesions": 2696,
+    "false_negative_erasure_rate": 0.5715875370919882,
+    "erasure_rate_by_size": {
+     "small": 0.7461423593827775,
+     "medium": 0.16363636363636364,
+     "large": 0.01284796573875803
+    },
+    "lesions_by_size": {
+     "small": 2009,
+     "medium": 220,
+     "large": 467
+    },
+    "false_positive_detection_rate": 0.4613845538215286,
+    "fabricated_components": 1153,
+    "predicted_components": 2499
+   },
+   "uncertainty_error_auroc": NaN
+  },
+  "distortion": {
+   "psnr": 25.928604931644642,
+   "ssim": 0.7918516597654446,
+   "dice": 0.6958462773842589,
+   "safety": {
+    "n_lesions": 2696,
+    "false_negative_erasure_rate": 0.4970326409495549,
+    "erasure_rate_by_size": {
+     "small": 0.6565455450472872,
+     "medium": 0.08636363636363636,
+     "large": 0.004282655246252677
+    },
+    "lesions_by_size": {
+     "small": 2009,
+     "medium": 220,
+     "large": 467
+    },
+    "false_positive_detection_rate": 0.3102094240837696,
+    "fabricated_components": 474,
+    "predicted_components": 1528
+   },
+   "uncertainty_error_auroc": 0.8522853695816492
+  },
+  "tumor-aware": {
+   "psnr": 25.007018453623925,
+   "ssim": 0.7617822196110186,
+   "dice": 0.6915293701295698,
+   "safety": {
+    "n_lesions": 2696,
+    "false_negative_erasure_rate": 0.4729228486646884,
+    "erasure_rate_by_size": {
+     "small": 0.627177700348432,
+     "medium": 0.06363636363636363,
+     "large": 0.0021413276231263384
+    },
+    "lesions_by_size": {
+     "small": 2009,
+     "medium": 220,
+     "large": 467
+    },
+    "false_positive_detection_rate": 0.37080024434941966,
+    "fabricated_components": 607,
+    "predicted_components": 1637
+   },
+   "uncertainty_error_auroc": 0.8177197062512186
+  }
+ }
+}

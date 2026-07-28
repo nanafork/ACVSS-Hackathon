@@ -1,0 +1,83 @@
+{
+ "checkpoint": "checkpoints/demo_brats.pt",
+ "meta": {
+  "size": 128,
+  "factor": 4,
+  "sigma": 0.03,
+  "kind": "cached",
+  "source": "/tmp/msd/slices_128.npz"
+ },
+ "n_slices": 1074,
+ "n_cases": 92,
+ "results": {
+  "lowres": {
+   "psnr": 21.58406986319296,
+   "ssim": 0.548615715468174,
+   "dice": 0.565134659082636,
+   "safety": {
+    "n_lesions": 5128,
+    "false_negative_erasure_rate": 0.6146645865834633,
+    "erasure_rate_by_size": {
+     "small": 0.7706323687031083,
+     "medium": 0.5360824742268041,
+     "large": 0.1085972850678733
+    },
+    "lesions_by_size": {
+     "small": 3732,
+     "medium": 291,
+     "large": 1105
+    },
+    "false_positive_detection_rate": 0.711376404494382,
+    "fabricated_components": 5065,
+    "predicted_components": 7120
+   },
+   "uncertainty_error_auroc": NaN
+  },
+  "distortion": {
+   "psnr": 25.10673144916079,
+   "ssim": 0.7685752159723357,
+   "dice": 0.6330887417410408,
+   "safety": {
+    "n_lesions": 5128,
+    "false_negative_erasure_rate": 0.6452808112324493,
+    "erasure_rate_by_size": {
+     "small": 0.8129689174705252,
+     "medium": 0.5017182130584192,
+     "large": 0.1167420814479638
+    },
+    "lesions_by_size": {
+     "small": 3732,
+     "medium": 291,
+     "large": 1105
+    },
+    "false_positive_detection_rate": 0.4779706275033378,
+    "fabricated_components": 1790,
+    "predicted_components": 3745
+   },
+   "uncertainty_error_auroc": 0.8452133360794531
+  },
+  "tumor-aware": {
+   "psnr": 24.320011286406714,
+   "ssim": 0.7385748396705649,
+   "dice": 0.6237857802220174,
+   "safety": {
+    "n_lesions": 5128,
+    "false_negative_erasure_rate": 0.6372854914196567,
+    "erasure_rate_by_size": {
+     "small": 0.802518756698821,
+     "medium": 0.5154639175257731,
+     "large": 0.11131221719457013
+    },
+    "lesions_by_size": {
+     "small": 3732,
+     "medium": 291,
+     "large": 1105
+    },
+    "false_positive_detection_rate": 0.5945031712473573,
+    "fabricated_components": 2812,
+    "predicted_components": 4730
+   },
+   "uncertainty_error_auroc": 0.8192847266557389
+  }
+ }
+}
