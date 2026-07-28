@@ -93,23 +93,60 @@ drive.mount('/content/drive')"""),
 `BRATS_ROOT` must be the folder that contains **one subfolder per case**, each
 holding `*_t1c.nii.gz` (or `*_t1ce.nii.gz`) and `*_seg.nii.gz`.
 
-The next cell checks that before you spend GPU time on it — a wrong modality
-tag or an extra nesting level is the most common way this run fails."""),
+Set `SEARCH_FROM` to anywhere above your data and run the next cell — it walks
+down looking for the folder that actually holds the cases and prints the value
+to use. The usual gotcha is an extra nesting level: the BraTS2020 archive
+unpacks to `BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData/<cases>`."""),
     (CODE, """import glob
 
-BRATS_ROOT = "/content/drive/MyDrive/BraTS2020_TrainingData"   # <-- EDIT ME
-WORK       = "/content/drive/MyDrive/tumor_aware_sr"           # cache + checkpoints
+SEARCH_FROM = "/content/drive/MyDrive"     # <-- a folder somewhere above the data
+WORK        = "/content/drive/MyDrive/tumor_aware_sr"
 os.makedirs(WORK, exist_ok=True)
 
-cases = sorted(d for d in glob.glob(os.path.join(BRATS_ROOT, "*")) if os.path.isdir(d))
-print(f"{len(cases)} case folders under {BRATS_ROOT}")
-if not cases:
-    raise SystemExit("No case folders. Check BRATS_ROOT - it should be the level "
-                     "ABOVE the per-case directories.")
 
-print("first case:", os.path.basename(cases[0]))
+def find_brats_roots(start, max_depth=5):
+    \"\"\"Return dirs whose immediate subfolders look like BraTS cases.\"\"\"
+    hits = []
+    for dirpath, dirnames, filenames in os.walk(start):
+        rel = os.path.relpath(dirpath, start)
+        depth = 0 if rel == "." else rel.count(os.sep) + 1
+        if depth >= max_depth:
+            dirnames[:] = []
+            continue
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        n = sum(1 for d in dirnames
+                if glob.glob(os.path.join(dirpath, d, "*_seg.nii*")))
+        if n:
+            hits.append((n, dirpath))
+    return sorted(hits, reverse=True)
+
+
+if not os.path.isdir(SEARCH_FROM):
+    raise SystemExit(f"{SEARCH_FROM} does not exist. Is Drive mounted (cell above)?")
+
+found = find_brats_roots(SEARCH_FROM)
+if not found:
+    print(f"No BraTS case folders anywhere under {SEARCH_FROM}.")
+    print("A case folder must contain a file matching *_seg.nii*. Top level holds:")
+    for e in sorted(os.listdir(SEARCH_FROM))[:40]:
+        print("   ", e + ("/" if os.path.isdir(os.path.join(SEARCH_FROM, e)) else ""))
+    print("\\nIf your data is still a .zip, unpack it first:")
+    print("   !unzip -q '/content/drive/MyDrive/archive.zip' -d /content/brats")
+    raise SystemExit("BraTS data not found - see the listing above.")
+
+for n, p in found:
+    print(f"{n:5d} cases   {p}")
+
+BRATS_ROOT = found[0][1]
+print(f"\\nUsing BRATS_ROOT = {BRATS_ROOT}")"""),
+
+    (MD, "Confirm the files inside one case, so the modality tag is right."),
+    (CODE, """cases = sorted(d for d in glob.glob(os.path.join(BRATS_ROOT, "*")) if os.path.isdir(d))
+print(f"{len(cases)} case folders\\nfirst case: {os.path.basename(cases[0])}")
 for f in sorted(os.listdir(cases[0])):
-    print("   ", f)"""),
+    print("   ", f)
+print("\\nSet MODALITY below to match: t1c matches *_t1c* or *_t1ce*, "
+      "flair matches *_t2f* or *_flair*.")"""),
 
     (MD, "## 4. Config"),
     (CODE, """import torch
