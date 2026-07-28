@@ -130,8 +130,9 @@ if not found:
     print("A case folder must contain a file matching *_seg.nii*. Top level holds:")
     for e in sorted(os.listdir(SEARCH_FROM))[:40]:
         print("   ", e + ("/" if os.path.isdir(os.path.join(SEARCH_FROM, e)) else ""))
-    print("\\nIf your data is still a .zip, unpack it first:")
-    print("   !unzip -q '/content/drive/MyDrive/archive.zip' -d /content/brats")
+    print("\\nIf your data is still a .zip, unpack it and search there instead:")
+    print("   !unzip -q '/content/drive/MyDrive/archive.zip' -d /content/brats_raw")
+    print("   SEARCH_FROM = '/content/brats_raw'   # then re-run this cell")
     raise SystemExit("BraTS data not found - see the listing above.")
 
 for n, p in found:
@@ -178,6 +179,86 @@ torch.manual_seed(SEED)
 print("device:", DEVICE)
 if DEVICE == "cpu":
     print("WARNING: no GPU. Training will be very slow - switch the runtime.")"""),
+
+    (MD, """## 4b. Copy the data to local disk first
+
+Drive is a FUSE mount: fine for a few large reads, slow for thousands of small
+ones. Decoding hundreds of volumes straight off it is noticeably slower than
+from Colab's local disk, so copy first and read locally.
+
+Two things make the copy cheap:
+
+* only the files actually used are copied — the chosen modality plus `_seg`,
+  which is 2 of the 4-5 volumes per case;
+* only `MAX_CASES` cases are copied, not the whole archive.
+
+The copy is resumable (same-size files are skipped), so a disconnect costs only
+what was still in flight. It is also skipped entirely once the slice cache on
+Drive exists, since at that point the raw volumes are never touched again.
+
+Local disk is wiped when the runtime recycles — that is fine, it is a scratch
+copy. The cache and checkpoints stay on Drive."""),
+    (CODE, """import shutil, time
+from src.data import BraTSSliceDataset
+
+COPY_TO_LOCAL = True
+LOCAL_ROOT    = "/content/brats"
+
+!df -h /content | tail -1
+
+if os.path.exists(CACHE):
+    print(f"slice cache already exists ({CACHE}) - raw volumes not needed, skipping copy")
+elif COPY_TO_LOCAL:
+    mod_tags = BraTSSliceDataset.MOD_TAGS[MODALITY]
+    src_cases = sorted(d for d in glob.glob(os.path.join(BRATS_ROOT, "*"))
+                       if os.path.isdir(d))
+    if MAX_CASES:
+        src_cases = src_cases[:MAX_CASES]
+    os.makedirs(LOCAL_ROOT, exist_ok=True)
+
+    t0, n_copied, n_skipped, n_bytes = time.time(), 0, 0, 0
+    n_mod = n_seg = 0     # files SEEN at the source, copied or already present
+    for i, s in enumerate(src_cases, 1):
+        dst = os.path.join(LOCAL_ROOT, os.path.basename(s))
+        os.makedirs(dst, exist_ok=True)
+        for tag, is_mod in [(t, True) for t in mod_tags] + [("seg", False)]:
+            for f in glob.glob(os.path.join(s, f"*{tag}.nii*")):
+                if is_mod:
+                    n_mod += 1
+                else:
+                    n_seg += 1
+                out = os.path.join(dst, os.path.basename(f))
+                size = os.path.getsize(f)
+                if os.path.exists(out) and os.path.getsize(out) == size:
+                    n_skipped += 1
+                    continue
+                shutil.copy2(f, out)
+                n_copied += 1
+                n_bytes += size
+        if i % 25 == 0 or i == len(src_cases):
+            print(f"  {i}/{len(src_cases)} cases | {n_bytes / 1e9:.2f} GB | "
+                  f"{time.time() - t0:.0f}s")
+
+    # Check the modality and the labels separately: a wrong MODALITY still finds
+    # the _seg files, so a combined count would look like success here and only
+    # blow up later with "No BraTS slices found".
+    if n_mod == 0:
+        raise SystemExit(
+            f"No files matching {mod_tags} under {BRATS_ROOT}. MODALITY={MODALITY!r} "
+            "does not match this dataset - check the file listing in cell 3b.")
+    if n_seg == 0:
+        raise SystemExit(
+            f"Found {n_mod} {MODALITY} files but no *_seg.nii* labels under "
+            f"{BRATS_ROOT}. This looks like a validation split, which ships "
+            "without segmentations; point at the training data instead.")
+
+    print(f"copied {n_copied} files ({n_bytes / 1e9:.2f} GB), "
+          f"skipped {n_skipped} already present, in {time.time() - t0:.0f}s")
+    print(f"{n_mod} {MODALITY} volumes + {n_seg} label volumes "
+          f"across {len(src_cases)} cases")
+    BRATS_ROOT = LOCAL_ROOT
+
+print("BRATS_ROOT =", BRATS_ROOT)"""),
 
     (MD, """## 5. Build the dataset (cached)
 
