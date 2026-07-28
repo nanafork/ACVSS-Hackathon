@@ -48,102 +48,52 @@
 \vspace{0.4em}
 \thinrule
 
-{\headfont\normalsize\bfseries\color{ink} Who this is for}\\[0.15em]
-Anyone on the team who might have to present this work or answer a question about it. Every
-number below is real and measured, but three of them are easy to quote in a way that is
-either far too pessimistic about our method or quietly wrong about what was measured. The
-four questions here are the ones a sceptical listener will actually ask.
-
-\vspace{0.3em}
-{\headfont\normalsize\bfseries\color{ink} Provenance}\\[0.15em]
-Figures come from the enhancing-tumor checkpoint trained on 17{,}233 axial slices from 468
-BraTS patients (Medical Segmentation Decathlon brain task), split by patient, and measured on
-the 70-patient validation split. Raw outputs are in \texttt{results/} in the repository and
-the checkpoints are on Hugging Face at \texttt{douyeszn/tumor-aware-sr}. The proposal's own
-results table comes from an earlier run on a smaller version of the dataset, so the digits
-differ; the reasoning below is what transfers.
-
-\vspace{0.3em}
-\thinrule
-
-The headline percentages in the proposal are easy to misread in both directions, and anyone presenting this work should be able to answer the four questions here. The worked figures come from a later run on a larger version of the dataset (17{,}233 slices from 468 patients) measured on the validation split, so they do not match the results table digit for digit; the reasoning is what transfers.
-
-\section*{The story, in plain language}
-
-Cheap, portable MRI scanners are the realistic route to brain imaging where scanners are
-scarce, and the pictures they produce are blurry and noisy. Deep learning can sharpen them,
-and that is what everyone does.
-
-The problem is what ``sharpen'' is trained to mean. These models are optimised for an average
-pixel error across the whole image, reported as PSNR. A small tumor occupies a tiny fraction
-of the pixels in a brain scan. So a model can quietly smooth a tumor away and lose almost
-nothing on the score it is being graded on. It produces a crisp, clean, confident image of a
-brain that no longer shows the thing the patient came in for.
-
-That is the failure we set out to measure and fix. The fix is not a new architecture: we
-change what the model is punished for, making mistakes inside the tumor cost far more than
-mistakes elsewhere. Then we hold image quality equal between the two models and ask a
-separate tumor detector what it can still find, so any difference is caused by the training
-objective rather than by one model simply being sharper.
-
-\textbf{What we found, in four steps:}
-
-\begin{itemize}
-  \item \textbf{It works.} On 70 real patients the tumor-aware model loses far less tumor
-        than the standard one, at the same segmentation quality and within 0.23~dB of the
-        same image quality. Nearly every patient improves: 66 of 70, with 1 worse.
-  \item \textbf{It works where the theory says it should, and not elsewhere.} The benefit
-        appears for the small enhancing tumor and vanishes for the whole tumor region, which
-        is nine times larger. That is exactly the prediction: the objective is only
-        misaligned when the structure is small enough that erasing it costs no measurable
-        image quality. The pattern is evidence the mechanism is real, not a caveat.
-  \item \textbf{It is not free.} Teaching a model to protect tumors makes it more willing to
-        report one that is not there. We measure that cost rather than hiding it, and we
-        found it can be largely bought back with a second loss term.
-  \item \textbf{The biggest weakness is not the sharpening.} Most of the tumor our pipeline
-        misses was already being missed by the tumor detector we measure with, before any
-        sharpening happens at all. That reframes the whole result, and it is question~1
-        below.
-\end{itemize}
-
-\thinrule
-
-\section*{First: what is a ``lesion''?}
-
-This one word causes most of the confusion, because we use it far more narrowly than a
-clinician would.
+{\headfont\normalsize\bfseries\color{ink} Terms}\\[0.15em]
+Three of these are used more narrowly here than in ordinary usage, and every confusing number
+in this document traces back to one of them.
 
 \begin{center}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{10.5cm}@{}}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}p{12.2cm}@{}}
 \toprule
-\textbf{Clinically} & An area of abnormal tissue. For us, a tumor: one three-dimensional
-mass that a radiologist would describe in a report. \\
-\textbf{In our metrics} & One connected blob of the tumor mask \emph{within a single 2D
-slice}. \\
+\textbf{Lesion} & Clinically, an area of abnormal tissue: for us a tumor, one
+three-dimensional mass a radiologist would describe in a report. \textbf{In our metrics it
+means something much narrower}: one connected blob of the tumor mask within a \emph{single 2D
+slice}. A scan is a stack of roughly 155 cross-sections, so one tumor crossing twenty of them
+counts as twenty lesions, a thin or broken enhancing rim fragments into several more within
+each slice, and a five-pixel speck counts the same as a whole tumor. This is why counts are
+large, why rates look alarming, and why lesions cannot be treated as independent samples. \\
+\textbf{Erasure} & The failure we set out to fix. The reconstruction smooths a real tumor
+away, so the scan looks normal when it is not. Measured as the fraction of true lesions the
+downstream segmenter can no longer find. Also called pseudo-normalization. Lower is safer. \\
+\textbf{Hallucination} & The opposite failure. The reconstruction invents tumor where there is
+none. Measured as the fraction of predicted lesions that overlap no true lesion. Lower is
+safer, and it tends to move in the opposite direction to erasure. \\
+\textbf{Floor} & What the downstream segmenter misses when handed the \emph{untouched original
+scan}, with no degradation and no reconstruction involved. It is large, so it is the
+denominator every erasure rate has to be read against. \\
+\textbf{Distortion-\linebreak optimal} & The standard approach, and our baseline: trained only
+to minimise average pixel error (PSNR). \\
+\textbf{Tumor-aware} & Ours: the same network and data, trained with errors inside the tumor
+weighted far more heavily. \\
+\textbf{Dice} & How well a predicted tumor outline overlaps the true one, from 0 to 1.
+Reported to show the two models are compared at equal segmentation quality. \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-An MRI scan is a stack of roughly 155 thin cross-sections. One tumor passing through twenty
-of them counts as \textbf{twenty lesions} in our numbers. Worse, the bright enhancing edge of
-a tumor is often thin and broken, so within a single slice it can fragment into several
-separately counted blobs. A five-pixel speck counts exactly the same as a whole tumor.
+\vspace{0.3em}
+{\headfont\normalsize\bfseries\color{ink} Provenance}\\[0.15em]
+Figures come from the enhancing-tumor checkpoint trained on 17{,}233 axial slices from 468
+BraTS patients (Medical Segmentation Decathlon brain task), split by patient, measured on the
+70-patient validation split. Raw outputs are in \texttt{results/} and the checkpoints are on
+Hugging Face at \texttt{douyeszn/tumor-aware-sr}. The proposal's results table comes from an
+earlier run on a smaller version of the dataset, so its digits differ.
 
-That has three consequences, and every confusing number in this document traces back to one
-of them:
-
-\begin{itemize}
-  \item Counts are large. A single slice can contain 26 ``lesions'' that a radiologist would
-        call one tumor.
-  \item Rates look alarming. ``21 of 26 erased'' is not 21 tumors lost; it is mostly small
-        fragments of things we did detect.
-  \item The lesions are not independent, so they cannot be treated as separate samples in a
-        statistical test. If a reconstruction loses a tumor, it loses it on every slice at
-        once. This is why we report per-patient numbers (question~3).
-\end{itemize}
-
+\vspace{0.3em}
 \thinrule
+
+\section*{Results}
 
 \subsection*{1. Why is the erasure rate around 50\%? Is the model that bad?}
 
@@ -168,7 +118,7 @@ So the defensible claim is not ``48.1\% against 54.6\%''. It is that super-resol
 
 \subsection*{2. What counts as a lesion? Are we losing whole tumors?}
 
-Almost never. A ``lesion'' here is a connected component in a single 2D slice, and the count is dominated by very small ones. Split by area:
+Almost never. Recall that a lesion here is one blob in one slice, so the count is dominated by very small ones. Split by area:
 
 \begin{center}
 \renewcommand{\arraystretch}{1.2}
