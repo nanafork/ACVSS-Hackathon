@@ -36,6 +36,10 @@ def main():
     ap.add_argument("--seg-epochs", type=int, default=10)
     ap.add_argument("--sr-epochs", type=int, default=18)
     ap.add_argument("--weight", type=float, default=40.0)
+    ap.add_argument("--split", default="train",
+                    help="which cached split to train on")
+    ap.add_argument("--seg-lambda", type=float, default=0.0,
+                    help="weight on the segmentation-consistency term; 0 disables it")
     ap.add_argument("--out", default="checkpoints/demo.pt")
     args = ap.parse_args()
 
@@ -43,7 +47,7 @@ def main():
     torch.manual_seed(0)
 
     if args.cached:
-        train_ds = make_dataset("cached", path=args.cached, split="train")
+        train_ds = make_dataset("cached", path=args.cached, split=args.split)
         kind = "cached"
         print(f"real data: {len(train_ds)} slices from {train_ds.n_cases()} cases")
     elif args.brats:
@@ -64,13 +68,23 @@ def main():
     sr_t = sr_unet(base=32, dropout=0.2)
     train_sr(sr_d, train_ds, make_sr_loss("distortion"), factor=args.factor,
              sigma=args.sigma, epochs=args.sr_epochs, bs=8, device=device, tag="sr-distortion")
-    train_sr(sr_t, train_ds, make_sr_loss("tumor_aware", weight=args.weight),
+    # Optional segmentation-consistency term. The lesion weight is an indirect
+    # proxy for "keep the tumor findable"; this term optimizes it directly, by
+    # penalizing the SR output when the frozen segmenter disagrees with the
+    # ground-truth mask on it. The segmenter's own weights stay frozen, so it
+    # remains an independent measuring instrument.
+    tumor_loss = make_sr_loss("tumor_aware", weight=args.weight,
+                              segmenter=seg.to(device) if args.seg_lambda > 0 else None,
+                              seg_lambda=args.seg_lambda)
+    train_sr(sr_t, train_ds, tumor_loss,
              factor=args.factor, sigma=args.sigma, epochs=args.sr_epochs, bs=8,
              device=device, tag="sr-tumor-aware")
 
     save_models(args.out, seg, sr_d, sr_t,
                 meta={"size": args.size, "factor": args.factor, "sigma": args.sigma,
-                      "kind": kind, "source": args.cached or args.root or "procedural"})
+                      "kind": kind, "source": args.cached or args.root or "procedural",
+                      "weight": args.weight, "seg_lambda": args.seg_lambda,
+                      "sr_epochs": args.sr_epochs})
     print("saved", args.out)
 
 
