@@ -29,3 +29,7 @@ data/msd/
 # sweep checkpoints live on HF (douyeszn/tumor-aware-sr); fetch, do not commit
 checkpoints/ck_*.pt
 checkpoints/sh_*.pt
+
+# safety layer assets (fetch with safety/scripts/fetch_assets.py)
+safety/assets/
+safety/robust_seg.pt

@@ -1,0 +1,58 @@
+{
+  "provenance": {
+    "data": "real BraTS via MSD Task01, enhancing tumor, et_full.npz",
+    "split": "val (70 cases, 2650 slices, 9490 lesions). test left sealed.",
+    "checkpoint": "douyeszn/tumor-aware-sr :: shared/sh_w40_sl0.0.pt",
+    "segmenter": "shared frozen segmenter unless stated otherwise",
+    "degradation": {"factor": 4, "sigma": 0.03},
+    "date": "2026-07-28"
+  },
+
+  "what_enhancement_does": {
+    "lesions_total": 9490,
+    "destroyed_by_enhancement": 339,
+    "recovered_by_enhancement": 774,
+    "invisible_in_both_segmenter_floor": 5116,
+    "found_in_both": 3261,
+    "net_lesions": 435,
+    "destroyed_rate": 0.0357,
+    "recovered_rate": 0.0816,
+    "by_size": {
+      "small": {"n": 6762, "destroyed": 314, "recovered": 571, "floor": 4971},
+      "medium": {"n": 1010, "destroyed": 24, "recovered": 163, "floor": 131},
+      "large": {"n": 1718, "destroyed": 1, "recovered": 40, "floor": 14}
+    }
+  },
+
+  "safety_layer_trigger": {
+    "method": "segment acquired scan and enhanced image; flag regions present in the first and absent in the second",
+    "hr_only_reader": {"flags": 1493, "precision": 0.113, "recall": 0.494,
+                       "real_vanishings": 340},
+    "domain_robust_reader": {"flags": 403, "precision": 0.203, "recall": 0.308,
+                             "real_vanishings": 266},
+    "coverage_note": "only lesions the reader saw in the acquired scan are flaggable"
+  },
+
+  "detectors_that_failed": {
+    "kspace_consistency": {"phantom_auroc": 0.948, "slice_level_real": "at chance",
+                           "best_operating_point": {"sensitivity": 0.65, "false_alarm": 0.45}},
+    "mc_dropout": {"pixel_auroc": 0.968, "slice_auroc": 0.563,
+                   "oracle_lesion_auroc": 0.287,
+                   "region_recall": {"small": 0.180, "medium": 0.656, "large": 1.0},
+                   "note": "AUROC below 0.5 means the sign is inverted: erasure comes with LOWER uncertainty"},
+    "conformal_logodds_monitor": {"auroc": 0.478, "miss_rate": 0.090,
+                                  "false_alarm": 0.796,
+                                  "note": "guarantee met only by flagging almost everything"},
+    "slice_persistence": {"K2": {"precision": 0.069}, "K3": {"precision": 0.038},
+                          "K4": {"precision": 0.016}}
+  },
+
+  "segmenter_domain_gap": {
+    "note": "train_segmenter trains on clean HR only; it is then used to score LR and SR",
+    "hr_only_reader_dice": {"HR": 0.842, "LR": 0.680, "SR": 0.779},
+    "domain_robust_reader_dice": {"HR": 0.825, "LR": 0.801, "SR": 0.810},
+    "measured_vanishings_before": 340,
+    "measured_vanishings_after": 266,
+    "implication": "22% of measured erasure was the reader's domain gap, not damage from super-resolution"
+  }
+}
