@@ -158,7 +158,7 @@ FACTOR   = 4          # k-space truncation (resolution loss)
 SIGMA    = 0.03       # Rician noise level
 MODALITY = "t1c"
 
-MAX_CASES       = 150       # None = all cases. Start smaller to time one epoch.
+MAX_CASES       = 20        # first pass. Raise to 150 / None once this completes.
 SLICES_PER_CASE = 12
 SELECT          = "tumor"   # "tumor" keeps the largest-lesion slices; "middle" the central ones
 MIN_TUMOR_PIX   = 20
