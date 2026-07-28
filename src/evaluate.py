@@ -81,6 +81,12 @@ def evaluate_pipeline(sr_models: dict, segmenter, dataset, factor: int = 4,
             auroc = uncertainty_error_auroc(unc.squeeze().cpu().numpy(), err)
             if not np.isnan(auroc):
                 acc[name]["auroc"].append(auroc)
+            # mc_predict switches dropout back on and does not undo it. Without
+            # this, every slice after the first was super-resolved stochastically
+            # at the top of the loop, so the reconstruction being scored was not
+            # the model's actual deterministic output. This silently corrupted
+            # every safety number this function has ever produced.
+            model.eval()
 
     # Reduce.
     results = {}

@@ -22,6 +22,52 @@ comparable, and conflating them is the single easiest way to mislead a judge.
 
 ---
 
+## Audit, 2026-07-28: two flaws that changed the headline
+
+Found by scrutinising the pipeline rather than the numbers. Both are recorded
+here because both were live when the run-5 result was first reported.
+
+**1. Dropout leak in `src/evaluate.py` (corrected).** `mc_predict` switches
+dropout on for its Monte Carlo passes and never restores eval mode. It runs at
+the bottom of the per-slice loop, so every slice after the first was
+super-resolved *stochastically* at the top of the next iteration. The
+reconstruction being scored was not the model's deterministic output. This
+corrupted every safety number this function ever produced. The same bug was
+fixed in `demo.py` and `viz_bridge.py` earlier the same day; `evaluate.py` was
+missed, and it is the one that generates the published tables.
+
+| enhancing tumor, 71 held-out patients | as published | after the fix |
+|---|---|---|
+| PSNR distortion / tumor-aware | 25.42 / 24.73 | 25.93 / 25.01 |
+| Dice | 0.692 / 0.693 | 0.696 / 0.692 |
+| **FNER** | 0.505 / **0.450** | 0.497 / **0.473** |
+| FPDR | 0.324 / 0.436 | 0.310 / 0.371 |
+
+The erasure gap falls from 5.5 points to **2.4 points**. The direction holds;
+the magnitude was less than half what was reported.
+
+**2. Lesions were counted per slice, so the significance was overstated.** The
+safety rates count connected components per 2D slice. One tumor spanning twenty
+axial slices contributes twenty "lesions" whose outcomes move together. The
+2,696 lesions come from **71 patients**, about 38 each. Treating them as
+independent inflates the effective sample size.
+
+Recomputed with the patient as the unit (`scripts/audit_significance.py`):
+
+| | |
+|---|---|
+| Mean per-patient erasure | 0.416 distortion, 0.384 tumor-aware |
+| Mean paired difference | **+3.2 points** |
+| 95% CI (patient bootstrap, 10k) | **[+0.7, +6.9] points** |
+| Two-sided bootstrap p | 0.007 |
+| Wilcoxon signed-rank p | 0.010 (n=40 non-tied) |
+| Patients helped / hurt / unchanged | 29 / 11 / 31 |
+| Naive SE vs clustered SE | 0.0096 vs 0.0159 (**optimistic by 1.7x**) |
+
+The effect survives, but the earlier "roughly 5 sigma" claim was wrong. The
+honest statement is p is about 0.01 with a wide interval, and the fix does not
+help every patient: 11 of 71 got worse.
+
 ## Runs
 
 ### Run 1 — original quick checkpoint (superseded)
