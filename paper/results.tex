@@ -37,179 +37,131 @@
 
 \begin{document}
 
-{\headfont\LARGE\bfseries How to read our results}
-
-\vspace{0.15em}
-{\headfont\normalsize\color{mid} Tumor-aware MRI super-resolution: what the numbers mean, and how they can mislead}
+{\headfont\Large\bfseries How to read our results}
+\hfill{\color{muted}\small Companion to \texttt{proposal.pdf} \,\textperiodcentered\, ACVSS Hackathon}
 
 \vspace{0.25em}
-{\color{muted}\small Companion to \texttt{proposal.pdf} \quad\textperiodcentered\quad ACVSS Hackathon}
+\thinrule
+\vspace{0.2em}
 
-\vspace{0.4em}
+{\headfont\normalsize\bfseries\color{ink} Terms}\\[0.1em]
+Read these first. Three are used more narrowly here than in ordinary usage, and every
+confusing number below traces back to one of them.
+
+\begin{center}\small
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.55cm}>{\raggedright\arraybackslash}p{12.75cm}@{}}
+\toprule
+\textbf{Lesion} & Clinically an area of abnormal tissue, so for us a tumor: one
+three-dimensional mass a radiologist would put in a report. \textbf{Our metrics mean something
+much narrower} --- one connected blob of tumor mask within a \emph{single 2D slice}. A scan is
+a stack of about 155 cross-sections, so one tumor crossing twenty of them counts as twenty
+lesions, a thin or broken enhancing rim fragments into several more inside each slice, and a
+five-pixel speck counts the same as a whole tumor. \\
+\textbf{Erasure} \newline \emph{(FNER)} & The failure we set out to fix: the reconstruction
+smooths a real tumor away, so the scan looks normal when it is not. Also called
+pseudo-normalization. Computed by taking each lesion in the \emph{true} mask and calling it
+found if the prediction covers at least \textbf{10\%} of it; anything less is erased. The rate
+is erased lesions over true lesions. Lower is safer. \\
+\textbf{Hallucination} \newline \emph{(FPDR)} & The opposite failure: the reconstruction
+invents tumor where there is none. Computed by taking each blob the model \emph{predicts} and
+calling it fabricated if less than \textbf{10\%} of that blob sits inside real tumor. The rate
+is fabricated blobs over predicted blobs. Lower is safer, and it tends to move against
+erasure. \\
+\textbf{Floor} & What the tumor detector misses when handed the \emph{untouched original scan},
+with no degradation or reconstruction involved. It is large, so it is the denominator every
+erasure rate must be read against. \\
+\textbf{Baseline \newline vs ours} & \emph{Distortion-optimal} is the standard approach and our
+baseline, trained only to minimise average pixel error. \emph{Tumor-aware} is ours: same
+network and data, with errors inside the tumor weighted far more heavily. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{-0.2em}
+{\small\itshape Both rates are measured from opposite directions on purpose: erasure asks how
+much of the real tumor we found, hallucination asks how much of what we reported was real. The
+10\% bar is generous, so erasure would look worse under a stricter rule. Both are counted per
+blob per 2D slice, so one tumor contributes many records --- which is why we report per-patient
+figures.}
+
+\vspace{0.3em}
 \thinrule
 
-{\headfont\normalsize\bfseries\color{ink} The result, in one page}\\[0.15em]
-Sharpening a cheap blurry brain scan with AI can quietly delete a small tumor. It happens
-because the sharpening model is graded on average pixel error, and a small tumor is a tiny
-fraction of the pixels, so removing it barely costs the model anything on its own scorecard.
-We changed what the model is punished for, making errors inside the tumor cost far more, and
-then measured how much tumor survives.
+\section*{The result}
 
-\textbf{It works.} On 70 real BraTS patients the tumor-aware model loses far less tumor than
-the standard one, and it does so at the \emph{same} segmentation quality, so it is not simply
-producing sharper pictures.
+Sharpening a cheap blurry scan with AI can quietly delete a small tumor, because the model is
+graded on average pixel error and a small tumor is a tiny fraction of the pixels. We changed
+what the model is punished for, weighting errors inside the tumor far more heavily, and then
+measured how much tumor survives. On 70 held-out BraTS patients it loses far less tumor than
+the standard model, at the \emph{same} segmentation quality.
 
-\begin{center}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.2cm}cc@{}}
+\begin{center}\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.4cm}cc@{}}
 \toprule
-\textbf{What the tumor detector was given} & \textbf{Tumor it missed} & \textbf{Caused by sharpening} \\
+\textbf{What the tumor detector was given} & \textbf{Tumor missed} & \textbf{Caused by sharpening} \\
 \midrule
-The original scan, untouched          & 45.5\% & --- \\
-Standard sharpening (baseline)        & 54.6\% & $+9.1$ points \\
+The original scan, untouched           & 45.5\% & --- \\
+Standard sharpening (baseline)         & 54.6\% & $+9.1$ points \\
 \textbf{Tumor-aware sharpening (ours)} & \textbf{48.1\%} & \textbf{$+2.6$ points} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Read the right-hand column, not the middle one. The tumor detector we measure with already
-misses 45.5\% of lesions on a perfect, untouched scan, so most of the middle column is not
-caused by sharpening at all. Sharpening adds 9.1 points of missed tumor on top of that floor,
-and \textbf{our objective removes 71\% of that damage} (9.1 down to 2.6). Nearly every patient
-benefits: 66 of 70 improve, 1 is worse, and the effect is far outside chance
-($p < 0.0001$).
+\textbf{Read the right-hand column, not the middle one.} The detector already misses 45.5\% on
+a perfect scan, so most of the middle column is nothing to do with sharpening. Sharpening adds
+9.1 points on top of that floor and \textbf{our objective removes 71\% of that damage}. 66 of
+70 patients improve, 1 is worse, $p < 0.0001$. Quality is genuinely matched, not approximately:
+Dice 0.660 against 0.675, and brain-masked PSNR within 0.23~dB.
 
-\textbf{Three things that make the finding credible, and one that limits it.}
+\subsection*{Is a rate near 50\% bad? Split it by lesion size}
 
-\begin{itemize}
-  \item It appears where the theory says it must and nowhere else. The benefit is there for the
-        small enhancing tumor and \emph{vanishes} for the whole tumor region, which is nine
-        times larger. That is the prediction: the objective is only misaligned when the
-        structure is too small to matter to a pixel-error score.
-  \item Large tumors are essentially never lost by either model, so a raw figure near 50\%
-        should not be read as ``half the tumors disappear''. The number is dominated by tiny
-        fragments, which is what the term \emph{lesion} below is about.
-  \item Image quality is genuinely matched, not approximately: Dice 0.660 against 0.675 and
-        brain-masked PSNR within 0.23~dB.
-  \item \textbf{The limit:} it is not free. Protecting tumors makes the model readier to report
-        one that is not there, and false alarms rise from 0.266 to 0.387. A second loss term
-        recovers most of that cost, at the price of about half the benefit.
-\end{itemize}
-
-\vspace{0.3em}
-\thinrule
-
-{\headfont\normalsize\bfseries\color{ink} Terms}\\[0.15em]
-Three of these are used more narrowly here than in ordinary usage, and every confusing number
-in this document traces back to one of them.
-
-\begin{center}
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}p{12.2cm}@{}}
-\toprule
-\textbf{Lesion} & Clinically, an area of abnormal tissue: for us a tumor, one
-three-dimensional mass a radiologist would describe in a report. \textbf{In our metrics it
-means something much narrower}: one connected blob of the tumor mask within a \emph{single 2D
-slice}. A scan is a stack of roughly 155 cross-sections, so one tumor crossing twenty of them
-counts as twenty lesions, a thin or broken enhancing rim fragments into several more within
-each slice, and a five-pixel speck counts the same as a whole tumor. This is why counts are
-large, why rates look alarming, and why lesions cannot be treated as independent samples. \\
-\textbf{Erasure} \newline \emph{False Negative Erasure Rate} & The failure we set out to
-fix: the reconstruction smooths a real tumor away, so the scan looks normal when it is not.
-Also called pseudo-normalization. What we actually compute: take each lesion in the
-\emph{true} mask, and call it \textbf{found} if the model's prediction covers at least
-\textbf{10\%} of it. Anything less counts as \textbf{erased}. The rate is the number of erased
-lesions divided by the number of true lesions. Lower is safer. \\
-\textbf{Hallucination} \newline \emph{False Positive Detection Rate} & The opposite failure:
-the reconstruction invents tumor where there is none. What we actually compute: take each blob
-the model \emph{predicts}, and call it \textbf{fabricated} if less than \textbf{10\%} of that
-blob sits inside real tumor. The rate is the number of fabricated blobs divided by the number
-of predicted blobs. Lower is safer, and it tends to move in the opposite direction to
-erasure. \\
-\multicolumn{2}{@{}p{15.3cm}@{}}{\small\itshape Three things to know before quoting either
-rate. The two are measured from opposite directions on purpose: erasure asks ``how much of the
-real tumor did we find?'', hallucination asks ``how much of what we reported was real?''. The
-10\% bar is generous, so recovering a tenth of a lesion counts as finding it and erasure would
-look worse under a stricter rule. And both are counted per blob per 2D slice, so one tumor
-contributes many separate records.} \\
-\textbf{Floor} & What the downstream segmenter misses when handed the \emph{untouched original
-scan}, with no degradation and no reconstruction involved. It is large, so it is the
-denominator every erasure rate has to be read against. \\
-\textbf{Distortion-\linebreak optimal} & The standard approach, and our baseline: trained only
-to minimise average pixel error (PSNR). \\
-\textbf{Tumor-aware} & Ours: the same network and data, trained with errors inside the tumor
-weighted far more heavily. \\
-\textbf{Dice} & How well a predicted tumor outline overlaps the true one, from 0 to 1.
-Reported to show the two models are compared at equal segmentation quality. \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\vspace{0.3em}
-{\headfont\normalsize\bfseries\color{ink} Provenance}\\[0.15em]
-Figures come from the enhancing-tumor checkpoint trained on 17{,}233 axial slices from 468
-BraTS patients (Medical Segmentation Decathlon brain task), split by patient, measured on the
-70-patient validation split. Raw outputs are in \texttt{results/} and the checkpoints are on
-Hugging Face at \texttt{douyeszn/tumor-aware-sr}. The proposal's results table comes from an
-earlier run on a smaller version of the dataset, so its digits differ.
-
-\vspace{0.3em}
-\thinrule
-
-\section*{Results}
-
-\subsection*{1. Why is the erasure rate around 50\%? Is the model that bad?}
-
-No. Roughly nine tenths of that number is not caused by super-resolution at all.
-
-The safety metric asks a downstream tumor segmenter to find the lesion, and then counts what it misses. So the number is a property of the whole pipeline, and the segmenter is part of the pipeline. If we hand that segmenter the \emph{original, untouched scan}, with no degradation and no reconstruction anywhere in sight, it still misses \textbf{45.5\%} of enhancing lesion components. That is its own blind spot, and it is the floor beneath every other number we report.
-
-\begin{center}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{@{}lcc@{}}
-\toprule
-\textbf{Image given to the segmenter} & \textbf{Lesions missed} & \textbf{Caused by our pipeline} \\
-\midrule
-Untouched original scan (the control) & 45.5\% & --- (this is the floor) \\
-Distortion-optimal reconstruction & 54.6\% & $+9.1$ points \\
-Tumor-aware reconstruction (ours) & 48.1\% & $+2.6$ points \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-So the defensible claim is not ``48.1\% against 54.6\%''. It is that super-resolution introduces 9.1 points of erasure on top of the floor, and the tumor-aware objective removes 71\% of that (9.1 down to 2.6). Quoting the absolute rates instead makes our own method look far worse than it is, and simultaneously hides the fact that the biggest weakness in the pipeline is the segmenter rather than the loss function.
-
-\subsection*{2. What counts as a lesion? Are we losing whole tumors?}
-
-Almost never. Recall that a lesion here is one blob in one slice, so the count is dominated by very small ones. Split by area:
-
-\begin{center}
-\renewcommand{\arraystretch}{1.2}
+\begin{center}\small
+\renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
 \textbf{Lesion size} & \textbf{How many} & \textbf{Floor} & \textbf{Baseline adds} & \textbf{Ours adds} \\
 \midrule
-Small, $<50$ px      & 6{,}762 (71\%) & 65.1\% & $+13.5$ & $+4.7$ \\
-Medium, 50--200 px   & 1{,}005        & 10.0\% & $+6.4$  & $+3.5$ \\
-Large, $>200$ px     & 1{,}723        & 0.5\%  & $+0.7$  & $+0.4$ \\
+Small, $<50$ px    & 6{,}762 (71\%) & 65.1\% & $+13.5$ & $+4.7$ \\
+Medium, 50--200 px & 1{,}005        & 10.0\% & $+6.4$  & $+3.5$ \\
+Large, $>200$ px   & 1{,}723        & 0.5\%  & $+0.7$  & $+0.4$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Read the bottom row first. A lesion above 200 px is missed 0.5\% of the time on a perfect scan and 0.9\% after our reconstruction. Substantial tumors are not vanishing. The overall rate is high because 71\% of all components are under 50 px, and two thirds of \emph{those} are missed even on the original image.
+Read the bottom row first: a lesion above 200~px is missed 0.5\% of the time on a perfect scan
+and 0.9\% after our reconstruction, so substantial tumors are not vanishing. The overall rate
+is high because 71\% of components are under 50~px and two thirds of those are missed even on
+the original image. Small does not mean unimportant --- a 30~px enhancing focus can be an early
+recurrence, and this is where the remaining work is --- but it is also partly an artefact of
+counting a fragmenting rim as many equal lesions.
 
-Two honest caveats. Small does not mean unimportant, since a 30 px enhancing focus can be an early recurrence, and this is where the remaining work is. And the count is partly an artefact: a thin enhancing rim breaks into many separately counted pieces, and the metric weights a five-pixel speck the same as a whole tumor.
+\subsection*{Three things that make it credible, and one that limits it}
 
-\subsection*{3. Why do we report per-patient numbers instead of per-lesion?}
+\begin{itemize}
+  \item \textbf{It appears only where the theory says it must.} The benefit is there for the
+        small enhancing tumor and \emph{vanishes} for the whole tumor region, nine times
+        larger. That is the prediction: the objective is only misaligned when the structure is
+        too small to matter to a pixel-error score.
+  \item \textbf{The patient is the unit of analysis.} One tumor spans many slices and appears
+        as a lesion in each, so those outcomes are correlated; pooling them fakes an interval
+        about 1.5 times too tight. Resampling patients instead gives a mean paired difference
+        of 6.5 points, 95\% CI $[5.2, 8.2]$.
+  \item \textbf{The weakest link is the detector, not the sharpening.} It misses 45.5\% of
+        lesions on an untouched scan. A stronger downstream segmenter would buy more than a
+        better loss function.
+  \item \textbf{The limit: it is not free.} Protecting tumors makes the model readier to report
+        one that is not there, and hallucination rises from 0.266 to 0.387. A second loss term
+        recovers most of that cost for about half the benefit, so the tradeoff is a dial rather
+        than a fixed price.
+\end{itemize}
 
-Because per-lesion numbers pretend to more precision than they have. One tumor spans many axial slices, and it appears as a separate ``lesion'' in each. Those outcomes are not independent: if a reconstruction loses that tumor, it loses it on every slice at once. Treating thousands of correlated records as thousands of independent samples makes the confidence interval look about 1.5 to 1.7 times tighter than it is.
-
-So we compute one erasure rate per patient, pair the two objectives within each patient, and bootstrap by resampling \emph{patients}. Reported that way the effect holds and the statement stays honest: on the larger dataset the mean paired difference is 6.5 points, 95\% CI $[5.2, 8.2]$, with 66 of 70 patients improved and 1 worse.
-
-\subsection*{4. What is the ``hallucination penalty''?}
-
-The two safety failures pull in opposite directions. \emph{Erasure} is missing a real tumor, and it is what we set out to reduce. \emph{Hallucination} is the opposite mistake, reporting tumor where there is none, measured as the fraction of predicted lesion components that overlap no true lesion. The penalty is how much worse that gets when we switch from the standard objective to ours.
-
-The mechanism is worth understanding, because it is not incidental. A lesion-weighted loss only asks that the tumor region be reconstructed accurately, so the cheapest way to satisfy it is to render anything tumor-like brighter and more solid, and that overshoot is exactly hallucination. Adding a term that requires the frozen segmenter's output to match the true mask punishes the mistake in both directions, and it takes the penalty from $+0.121$ down to $+0.017$ at the cost of roughly half the erasure gain. Which operating point is right is a clinical judgement, not ours: a screening service that cannot absorb false alarms should choose differently from one triaging known cases.
+\vspace{0.2em}
+{\small\itshape Provenance: enhancing-tumor checkpoint trained on 17{,}233 axial slices from
+468 BraTS patients (Medical Segmentation Decathlon brain task), split by patient, measured on
+the 70-patient validation split. Raw outputs in \texttt{results/}; checkpoints at
+\texttt{douyeszn/tumor-aware-sr} on Hugging Face. The proposal's results table is from an
+earlier, smaller run, so its digits differ.}
 
 \end{document}
