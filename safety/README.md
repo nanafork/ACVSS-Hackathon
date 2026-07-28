@@ -10,9 +10,46 @@ measured on the **val** split; **test was left sealed**.
 
 ## ▶ Run the demo
 
+`safety/demo_safety.html` is the one to present: a single self-contained file,
+no server, no GPU, no network. Open it in any browser.
+
+Two cases, a scan-quality slider (×2 → ×8) and a SAFETY LAYER toggle.
+
+**Case A (opens by default) — the run to present**
+
+| slider | verdict |
+|---|---|
+| ×2, ×3 | clear |
+| **×4** | **flag on the standard model, none on ours** |
+| ×5, ×6, ×8 | cannot verify |
+
+**Case B** — the standard model loses a lesion ours keeps (flags at ×2, ×3).
+
+The verdict has **three** states, in precedence order, all computed from the
+slider and the image rather than keyed to a slice:
+
+1. no usable reference in the acquired scan → **cannot verify**
+2. a region present before enhancement is gone after → **flag**
+3. most lesions below the ~N px the acquisition actually measured → **cannot verify**
+4. otherwise → **clear**
+
+The third state is the honest part: at ×N the acquisition never sampled
+structures under about N px, so *no* image-space check can confirm them. Silence
+there means unmeasured, not safe — and saying so out loud is stronger than
+letting a green tick imply a guarantee.
+
+To regenerate it, or to point it at different slices:
+
 ```bash
 pip install torch numpy imageio marimo huggingface_hub
-python safety/scripts/fetch_assets.py     # ~290 MB from HF, one time
+python safety/scripts/fetch_assets.py        # ~290 MB from HF, one time
+python safety/scripts/build_demo_html.py     # -> safety/demo_safety.html
+```
+
+There is also a live GPU version, which recomputes on any of the 2,650 held-out
+slices — useful for showing the rule is a rule and not a lookup table:
+
+```bash
 marimo run safety/app.py                  # booth mode, code hidden
 ```
 
