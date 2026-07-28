@@ -114,12 +114,29 @@ slice}. A scan is a stack of roughly 155 cross-sections, so one tumor crossing t
 counts as twenty lesions, a thin or broken enhancing rim fragments into several more within
 each slice, and a five-pixel speck counts the same as a whole tumor. This is why counts are
 large, why rates look alarming, and why lesions cannot be treated as independent samples. \\
-\textbf{Erasure} & The failure we set out to fix. The reconstruction smooths a real tumor
-away, so the scan looks normal when it is not. Measured as the fraction of true lesions the
-downstream segmenter can no longer find. Also called pseudo-normalization. Lower is safer. \\
-\textbf{Hallucination} & The opposite failure. The reconstruction invents tumor where there is
-none. Measured as the fraction of predicted lesions that overlap no true lesion. Lower is
-safer, and it tends to move in the opposite direction to erasure. \\
+\textbf{Erasure} \newline \emph{False Negative Erasure Rate} & The failure we set out to
+fix: the reconstruction smooths a real tumor away, so the scan looks normal when it is not.
+Also called pseudo-normalization. Precisely: let $G$ be the set of connected components of the
+\emph{true} tumor mask and $P$ the predicted mask. A component $g \in G$ counts as
+\textbf{detected} when the prediction covers at least a fraction $\tau$ of it,
+\[ \frac{|g \cap P|}{|g|} \;\ge\; \tau, \qquad \tau = 0.1, \]
+and as \textbf{erased} otherwise. Then
+$\mathrm{FNER} = \bigl|\{g \in G : g \text{ erased}\}\bigr| \,/\, |G|$. Lower is safer. \\
+\textbf{Hallucination} \newline \emph{False Positive Detection Rate} & The opposite failure:
+the reconstruction invents tumor where there is none. Let $C$ be the set of connected
+components of the \emph{predicted} mask and $T$ the true mask. A component $c \in C$ counts as
+\textbf{fabricated} when less than a fraction $\tau$ of \emph{it} lies inside true tumor,
+\[ \frac{|c \cap T|}{|c|} \;<\; \tau, \qquad \tau = 0.1, \]
+and then
+$\mathrm{FPDR} = \bigl|\{c \in C : c \text{ fabricated}\}\bigr| \,/\, |C|$. Lower is safer, and
+it tends to move in the opposite direction to erasure. \\
+\multicolumn{2}{@{}p{15.3cm}@{}}{\small\itshape Two properties of these definitions are worth
+knowing before quoting them. They are normalised differently and deliberately so: erasure
+divides overlap by the size of the \emph{true} lesion (did we find what was there?), while
+hallucination divides by the size of the \emph{predicted} blob (is what we reported real?).
+And $\tau = 0.1$ is lenient: recovering a tenth of a lesion counts as finding it, so erasure
+would look worse under a stricter threshold. Both rates are computed per component per 2D
+slice, so a single tumor contributes many records.} \\
 \textbf{Floor} & What the downstream segmenter misses when handed the \emph{untouched original
 scan}, with no degradation and no reconstruction involved. It is large, so it is the
 denominator every erasure rate has to be read against. \\
