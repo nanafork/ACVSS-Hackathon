@@ -19,6 +19,13 @@ def _np(img: torch.Tensor) -> np.ndarray:
 
 # Which hue a predicted mask gets. Keyed on the column name so the 2D panels and
 # the 3D renders label the same model with the same color.
+_TITLE = {
+    "low-res": "low-res input",
+    "distortion": "distortion-optimal\n(baseline)",
+    "tumor-aware": "tumor-aware\n(OURS)",
+    "true HR": "true HR\n(reference)",
+}
+
 _PRED_COLOR = {
     "low-res": FIG["low_res"],
     "distortion": FIG["distortion"],
@@ -44,7 +51,10 @@ def comparison_figure(hr, mask, lr, sr_outputs: dict, segmenter, save_path=None)
         ax[0, j].imshow(im, cmap="gray", vmin=0, vmax=1)
         # Title in the model's own color, so the column, its fill below, and
         # the 3D panel elsewhere on the page all agree on which model is which.
-        ax[0, j].set_title(name, color=_PRED_COLOR.get(name, FIG["low_res"]),
+        # Say which column is ours inside the image, so a screenshot of the
+        # figure alone is still unambiguous.
+        ax[0, j].set_title(_TITLE.get(name, name),
+                           color=_PRED_COLOR.get(name, FIG["low_res"]),
                            fontsize=11, fontweight="semibold", pad=7)
         with torch.no_grad():
             pred = to_mask_np(segmenter(img if img.dim() == 4 else img[None]))

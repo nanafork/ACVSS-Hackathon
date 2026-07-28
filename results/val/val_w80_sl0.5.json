@@ -1,0 +1,91 @@
+{
+ "checkpoint": "/tmp/ck_w80_sl0.5.pt",
+ "split": "val",
+ "meta": {
+  "size": 128,
+  "factor": 4,
+  "sigma": 0.03,
+  "kind": "cached",
+  "source": "/tmp/msd/et_full.npz",
+  "weight": 80.0,
+  "seg_lambda": 0.5,
+  "sr_epochs": 45,
+  "seed": 0
+ },
+ "n_slices": 2650,
+ "n_cases": 70,
+ "results": {
+  "lowres": {
+   "psnr": 21.441947311299845,
+   "psnr_brain": 21.836812758992618,
+   "ssim": 0.4981609863183408,
+   "dice": 0.4967634225803309,
+   "safety": {
+    "n_lesions": 9490,
+    "false_negative_erasure_rate": 0.719072708113804,
+    "erasure_rate_by_size": {
+     "small": 0.9142265601892932,
+     "medium": 0.46567164179104475,
+     "large": 0.10098665118978525
+    },
+    "lesions_by_size": {
+     "small": 6762,
+     "medium": 1005,
+     "large": 1723
+    },
+    "false_positive_detection_rate": 0.21614100185528756,
+    "fabricated_components": 1398,
+    "predicted_components": 6468
+   },
+   "uncertainty_error_auroc": NaN
+  },
+  "distortion": {
+   "psnr": 25.013486320513948,
+   "psnr_brain": 24.593946572373877,
+   "ssim": 0.7730139163755021,
+   "dice": 0.6652554309597025,
+   "safety": {
+    "n_lesions": 9490,
+    "false_negative_erasure_rate": 0.589041095890411,
+    "erasure_rate_by_size": {
+     "small": 0.7935522034900917,
+     "medium": 0.2009950248756219,
+     "large": 0.012768427161926872
+    },
+    "lesions_by_size": {
+     "small": 6762,
+     "medium": 1005,
+     "large": 1723
+    },
+    "false_positive_detection_rate": 0.19878391019644528,
+    "fabricated_components": 850,
+    "predicted_components": 4276
+   },
+   "uncertainty_error_auroc": 0.8471784801662061
+  },
+  "tumor-aware": {
+   "psnr": 24.265229518361345,
+   "psnr_brain": 23.923385441059043,
+   "ssim": 0.7520925328416644,
+   "dice": 0.6765717165671816,
+   "safety": {
+    "n_lesions": 9490,
+    "false_negative_erasure_rate": 0.5544783983140148,
+    "erasure_rate_by_size": {
+     "small": 0.7481514344868382,
+     "medium": 0.1781094527363184,
+     "large": 0.013929193267556587
+    },
+    "lesions_by_size": {
+     "small": 6762,
+     "medium": 1005,
+     "large": 1723
+    },
+    "false_positive_detection_rate": 0.216045197740113,
+    "fabricated_components": 956,
+    "predicted_components": 4425
+   },
+   "uncertainty_error_auroc": 0.8214313532941769
+  }
+ }
+}

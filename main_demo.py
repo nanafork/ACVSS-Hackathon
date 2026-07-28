@@ -160,9 +160,9 @@ PAGE = """<!doctype html>
     color:var(--ink-light)}}
   .lscale{{display:grid; grid-template-columns:15rem 1fr 9rem; gap:1rem;
     font-family:var(--mono); font-size:.68rem; color:var(--ink-light)}}
-  .lscale span:first-child{{grid-column:2; justify-self:start}}
-  .lscale span:nth-child(2){{grid-column:2; justify-self:center; font-family:var(--font)}}
-  .lscale span:last-child{{grid-column:2; justify-self:end}}
+  .lscale > div{{grid-column:2; display:flex; justify-content:space-between;
+    align-items:baseline; border-top:1px solid var(--border); padding-top:.3rem}}
+  .lscale .mid{{font-family:var(--font)}}
   .lkey{{display:flex; flex-direction:column; gap:.4rem; margin-top:1rem;
     padding-top:.9rem; border-top:1px solid var(--border);
     font-size:.78rem; color:var(--ink-mid)}}
@@ -244,12 +244,12 @@ PAGE = """<!doctype html>
     <div class="tag">Validation result &middot; real BraTS, 70 unseen patients</div>
     <h2>At equal segmentation quality, the tumor-aware objective erases fewer enhancing lesions.</h2>
     <div class="vitals">
-      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Caused by distortion-optimal SR</div>
+      <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Distortion-optimal SR <b style="color:var(--ink-mid)">(baseline)</b></div>
         <div class="v">+9.1<span class="u">pp</span></div>
-        <div class="d">above the segmenter's own floor of 45.5%</div></div>
-      <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Caused by tumor-aware SR</div>
+        <div class="d">erasure it causes, above the segmenter's floor of 45.5%</div></div>
+      <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Tumor-aware SR <b style="color:var(--safe)">(OURS)</b></div>
         <div class="v">+2.6<span class="u">pp</span></div>
-        <div class="d">removes <b>71%</b> of the damage super-resolution does</div></div>
+        <div class="d">erasure ours causes &mdash; removes <b>71%</b> of the damage</div></div>
       <div class="vital"><div class="k"><span class="dot" style="background:var(--accent)"></span>Patients helped</div>
         <div class="v" style="color:var(--accent-deep)">66<span class="u">/70</span></div>
         <div class="d">1 worse, 3 unchanged; p&nbsp;&lt;&nbsp;0.0001, 95% CI [5.2, 8.2] pp</div></div>
@@ -267,16 +267,17 @@ PAGE = """<!doctype html>
         <div class="lnum">45.5%<span>missed</span></div>
       </div>
       <div class="lrow">
-        <div class="llab">Distortion-optimal SR<span>trained for image quality</span></div>
+        <div class="llab">Distortion-optimal SR <span style="display:inline;font-weight:600;color:var(--ink-mid)">(baseline)</span><span>the standard approach: trained only for image quality</span></div>
         <div class="lbar"><i class="floor" style="width:75.8%"></i><i class="add di" style="width:15.2%"></i></div>
         <div class="lnum">54.6%<span><b style="color:var(--erased)">+9.1</b> caused by SR</span></div>
       </div>
       <div class="lrow">
-        <div class="llab">Tumor-aware SR<span>our objective</span></div>
+        <div class="llab">Tumor-aware SR <span style="display:inline;font-weight:700;color:var(--safe)">(OURS)</span><span>our objective: lesion-weighted loss</span></div>
         <div class="lbar"><i class="floor" style="width:75.8%"></i><i class="add ta" style="width:4.3%"></i></div>
         <div class="lnum">48.1%<span><b style="color:var(--safe)">+2.6</b> caused by SR</span></div>
       </div>
-      <div class="lscale"><span>0%</span><span>of enhancing lesion components missed</span><span>60%</span></div>
+      <div class="lscale"><div><span>0%</span>
+        <span class="mid">of enhancing lesion components missed</span><span>60%</span></div></div>
       <div class="lkey">
         <span><i class="sw floor"></i>missed on the original scan too &mdash; the segmenter's
         own blind spot, not caused by us</span>
@@ -311,15 +312,58 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
+    <div class="tag">Broken down by lesion size</div>
+    <h2>Large lesions are almost never lost. Small ones are the whole problem.</h2>
+    <p class="note">Same 70 validation patients, 9,490 lesion components, split by area. The
+    <b>floor</b> column is what the segmenter misses on the untouched original scan; the
+    <b>adds</b> columns are what each objective loses on top of that, and those are the only
+    numbers either model is responsible for.</p>
+    <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
+      border-radius:14px; padding:.4rem">
+      <tr>
+        <th>lesion size</th><th class=num>how many</th>
+        <th class=num>floor<br><span style="font-weight:400;text-transform:none;letter-spacing:0">original scan</span></th>
+        <th class=num>distortion-optimal<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(baseline) adds</span></th>
+        <th class=num>tumor-aware<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(ours) adds</span></th>
+      </tr>
+      <tr><td><b>small</b> &lt;50&nbsp;px</td><td class=num>6,762 <span style="color:var(--ink-light)">(71%)</span></td>
+        <td class=num>65.1%</td>
+        <td class=num style="color:var(--erased)"><b>+13.5</b></td>
+        <td class=num style="color:var(--safe)"><b>+4.7</b></td></tr>
+      <tr><td><b>medium</b> 50&ndash;200&nbsp;px</td><td class=num>1,005</td>
+        <td class=num>10.0%</td>
+        <td class=num style="color:var(--erased)"><b>+6.4</b></td>
+        <td class=num style="color:var(--safe)"><b>+3.5</b></td></tr>
+      <tr><td><b>large</b> &gt;200&nbsp;px</td><td class=num>1,723</td>
+        <td class=num>0.5%</td>
+        <td class=num style="color:var(--erased)"><b>+0.7</b></td>
+        <td class=num style="color:var(--safe)"><b>+0.4</b></td></tr>
+    </table>
+    <p class="note"><b>Read the large row first.</b> A lesion over 200&nbsp;px is missed 0.5% of
+    the time on a perfect scan and 0.9% after our reconstruction. Substantial tumors are not
+    being erased by either model, and a raw rate near 50% should not be read as "half the
+    tumors vanish".</p>
+    <p class="note"><b>Then read the small row.</b> 71% of all components are under 50&nbsp;px,
+    which is what drags the overall rate up. Two thirds of that is the segmenter: it misses
+    65.1% of them on the original image. The baseline objective adds 13.5 points on top;
+    ours adds 4.7. <b>So in the bin that dominates the metric, the tumor-aware objective
+    removes about two thirds of the erasure super-resolution causes.</b></p>
+    <p class="note">Small does not mean unimportant &mdash; a 30&nbsp;px enhancing focus can be
+    an early recurrence, and this is where the remaining work is. It is also partly an
+    artefact: a thin enhancing rim fragments into many 4-connected pieces, and this metric
+    weights a 5-pixel speck the same as a whole tumor.</p>
+  </section>
+
+  <section class="slide">
     <div class="tag">Four viewports</div>
     <h2>What each objective leaves behind.</h2>
     <div class="panels">
     <figure><img src="data:image/png;base64,{img_true}" alt="ground truth tumor in 3D">
       <figcaption><b>Ground truth.</b> The true lesions, in blue.</figcaption></figure>
     <figure><img src="data:image/png;base64,{img_ta}" alt="tumor-aware reconstruction in 3D">
-      <figcaption><b>Tumor-aware.</b> Lesions preserved.</figcaption></figure>
+      <figcaption><b>Tumor-aware &mdash; OURS.</b> Lesions preserved.</figcaption></figure>
     <figure><img src="data:image/png;base64,{img_di}" alt="distortion reconstruction in 3D">
-      <figcaption><b>Distortion-optimal.</b> Small lesions dropped.</figcaption></figure>
+      <figcaption><b>Distortion-optimal &mdash; baseline.</b> Small lesions dropped.</figcaption></figure>
     {unc_panel}
     </div>
     <p class="note">A blue ghost with no fill inside it is a lesion the model lost. This is
@@ -339,8 +383,8 @@ PAGE = """<!doctype html>
         matched image quality, <b>image quality is not a safety metric</b>.</p>
         <div class="legend">
           <span><span class="dot" style="background:var(--true)"></span>ground truth</span>
-          <span><span class="dot" style="background:var(--safe)"></span>tumor-aware</span>
-          <span><span class="dot" style="background:var(--erased)"></span>distortion-optimal</span>
+          <span><span class="dot" style="background:var(--safe)"></span>tumor-aware <b>(ours)</b></span>
+          <span><span class="dot" style="background:var(--erased)"></span>distortion-optimal (baseline)</span>
           <span><span class="ramp"></span>uncertainty, low to high</span>
         </div>
       </div>
@@ -559,8 +603,11 @@ def _slice_blocks(device, n_slices):
             excess = v["erased"] - floor
             exc = ("<b>floor</b>" if ref
                    else f"{excess:+d}" if excess else "0")
+            tags = {"distortion": " <span style='color:var(--ink-light)'>(baseline)</span>",
+                    "tumor-aware": " <b style='color:var(--safe)'>(ours)</b>",
+                    "low-res": " <span style='color:var(--ink-light)'>(degraded input)</span>"}
             label = ("true HR <span style='color:var(--ink-light)'>(reference)</span>"
-                     if ref else k)
+                     if ref else k + tags.get(k, ""))
             cells.append(
                 f"<tr><td>{label}</td><td class=num>{q}</td><td class=num>{sm}</td>"
                 f"<td class=num>{v['dice']:.3f}</td>"
