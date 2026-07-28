@@ -48,6 +48,57 @@
 \vspace{0.4em}
 \thinrule
 
+{\headfont\normalsize\bfseries\color{ink} The result, in one page}\\[0.15em]
+Sharpening a cheap blurry brain scan with AI can quietly delete a small tumor. It happens
+because the sharpening model is graded on average pixel error, and a small tumor is a tiny
+fraction of the pixels, so removing it barely costs the model anything on its own scorecard.
+We changed what the model is punished for, making errors inside the tumor cost far more, and
+then measured how much tumor survives.
+
+\textbf{It works.} On 70 real BraTS patients the tumor-aware model loses far less tumor than
+the standard one, and it does so at the \emph{same} segmentation quality, so it is not simply
+producing sharper pictures.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.2cm}cc@{}}
+\toprule
+\textbf{What the tumor detector was given} & \textbf{Tumor it missed} & \textbf{Caused by sharpening} \\
+\midrule
+The original scan, untouched          & 45.5\% & --- \\
+Standard sharpening (baseline)        & 54.6\% & $+9.1$ points \\
+\textbf{Tumor-aware sharpening (ours)} & \textbf{48.1\%} & \textbf{$+2.6$ points} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Read the right-hand column, not the middle one. The tumor detector we measure with already
+misses 45.5\% of lesions on a perfect, untouched scan, so most of the middle column is not
+caused by sharpening at all. Sharpening adds 9.1 points of missed tumor on top of that floor,
+and \textbf{our objective removes 71\% of that damage} (9.1 down to 2.6). Nearly every patient
+benefits: 66 of 70 improve, 1 is worse, and the effect is far outside chance
+($p < 0.0001$).
+
+\textbf{Three things that make the finding credible, and one that limits it.}
+
+\begin{itemize}
+  \item It appears where the theory says it must and nowhere else. The benefit is there for the
+        small enhancing tumor and \emph{vanishes} for the whole tumor region, which is nine
+        times larger. That is the prediction: the objective is only misaligned when the
+        structure is too small to matter to a pixel-error score.
+  \item Large tumors are essentially never lost by either model, so a raw figure near 50\%
+        should not be read as ``half the tumors disappear''. The number is dominated by tiny
+        fragments, which is what the term \emph{lesion} below is about.
+  \item Image quality is genuinely matched, not approximately: Dice 0.660 against 0.675 and
+        brain-masked PSNR within 0.23~dB.
+  \item \textbf{The limit:} it is not free. Protecting tumors makes the model readier to report
+        one that is not there, and false alarms rise from 0.266 to 0.387. A second loss term
+        recovers most of that cost, at the price of about half the benefit.
+\end{itemize}
+
+\vspace{0.3em}
+\thinrule
+
 {\headfont\normalsize\bfseries\color{ink} Terms}\\[0.15em]
 Three of these are used more narrowly here than in ordinary usage, and every confusing number
 in this document traces back to one of them.
