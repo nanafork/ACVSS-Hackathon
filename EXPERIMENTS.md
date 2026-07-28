@@ -14,11 +14,11 @@ comparable, and conflating them is the single easiest way to mislead a judge.
 
 | | |
 |---|---|
-| Checkpoint the local demo uses | `checkpoints/demo.pt` (run 2, **synthetic**) |
+| Checkpoint the local demo uses | `checkpoints/demo_et.pt` (run 5, **real BraTS**) |
 | Best real-data checkpoint | `checkpoints/demo_brats.pt` (run 4) — downloaded, md5 verified, loads and runs locally |
-| Does the headline claim hold on real data? | **Yes, for enhancing tumor** (run 5): erasure 0.505 → 0.450 on 71 unseen patients. **No, for whole tumor** (run 4). The split is the finding. |
-| Numbers currently in `paper/` | From an unreproducible older run. **Unverified.** |
-| Numbers currently in the deck | Run 2 (synthetic). Labelled as synthetic. |
+| Does the headline claim hold on real data? | **Yes, for enhancing tumor**, modestly: +3.2 points per patient, 95% CI [0.7, 6.9], p=0.007, on 71 unseen patients. **No, for whole tumor**. The split is the finding. |
+| Numbers currently in `paper/` | Real BraTS, post-audit. `results/brats_et_heldout_fixed.json`. |
+| Numbers currently in the deck | Real BraTS, post-audit, patient-level. |
 
 ---
 

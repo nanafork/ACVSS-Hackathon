@@ -53,7 +53,7 @@ Low-cost, portable MRI scanners produce lower-quality, blurry images. Machine le
 
 \vspace{0.5em}
 {\headfont\normalsize\bfseries\color{ink} Abstract}\\[0.15em]
-Portable low-field MRI could widen access to brain imaging where scanners are scarce, but its scans are noisy and low-resolution, and they look different from the high-field scans that analysis models are trained on (they are out-of-distribution), which hurts automated analysis. Deep learning super-resolution sharpens these scans to bridge that gap, but such models are usually trained and judged only by image-quality scores (PSNR, SSIM). Those scores barely change if the model smooths away a small tumor (pseudo-normalization) or invents one that is not there (hallucination), two failure modes expected from the perception-distortion tradeoff (Blau and Michaeli, 2018) and documented for deep medical imaging (Antun et al., 2020; Cohen et al., 2018; Bhadra et al., 2021). We simulate low-field scans by discarding high-frequency detail in the frequency domain (k-space) and adding realistic MRI noise, and train two super-resolution models: a standard image-quality-optimized one and a tumor-aware one that weights the tumor region. With image quality held equal, we measure how often each model erases a real tumor or invents a false one, broken down by tumor size, using a downstream tumor-segmentation model, and we produce an uncertainty map (via Monte Carlo dropout) that flags where the output is unreliable. We create the training pairs by degrading good scans ourselves, so no special paired or African dataset is required.
+Portable low-field MRI could widen access to brain imaging where scanners are scarce, but its scans are noisy and low-resolution, and they look different from the high-field scans that analysis models are trained on (they are out-of-distribution), which hurts automated analysis. Deep learning super-resolution sharpens these scans to bridge that gap, but such models are usually trained and judged only by image-quality scores (PSNR, SSIM). Those scores barely change if the model smooths away a small tumor (pseudo-normalization) or invents one that is not there (hallucination), two failure modes expected from the perception-distortion tradeoff (Blau and Michaeli, 2018) and documented for deep medical imaging (Antun et al., 2020; Cohen et al., 2018; Bhadra et al., 2021). We simulate low-field scans by discarding high-frequency detail in the frequency domain (k-space) and adding realistic MRI noise, and train two super-resolution models: a standard image-quality-optimized one and a tumor-aware one that weights the tumor region. With image quality held equal, we measure how often each model erases a real tumor or invents a false one, broken down by tumor size, using a downstream tumor-segmentation model, and we produce an uncertainty map (via Monte Carlo dropout) that flags where the output is unreliable. We create the training pairs by degrading good scans ourselves, so no special paired or African dataset is required. On 71 held-out BraTS patients the tumor-aware objective reduces per-patient erasure of enhancing lesions by 3.2 points (95\% CI 0.7 to 6.9, $p = 0.007$) at equal segmentation quality, while raising the false positive rate from 0.310 to 0.371. The same pipeline shows no benefit for whole tumor, a region nine times larger, which is what the perception-distortion argument predicts and is the clearest evidence that the mechanism is the one we claim.
 
 \vspace{0.3em}
 {\headfont\normalsize\bfseries\color{ink} Contributions}
@@ -147,48 +147,37 @@ Standard super-resolution maximizes pixel fidelity, but distortion and perceptua
 \end{itemize}
 The expected, defensible finding: the quality-optimal model erases small tumors that the tumor-aware model preserves, so PSNR is not a safety metric. As a baseline check we confirm super-resolution improves segmentation over the low-resolution input (Zhou et al., 2022). We also test whether high uncertainty coincides with the residual errors, and benchmark CPU-only inference latency and memory for deployment.
 
-\textbf{Scope.} A real low-field scan differs from a downsampled high-field image in contrast, noise, and distortion, not only resolution. We approximate the noise with the Rician model and treat this as a proof of concept on simulated degradation; validation on real low-field or BraTS-Africa data is the next step, not a claim we make here.
+\textbf{Scope.} The anatomy is real BraTS, but the acquisition is not: we degrade high-field scans rather than imaging anyone at low field. A real low-field scan differs from a downsampled high-field image in contrast, noise, and distortion, not only resolution, and we approximate only the last two. Validation on a genuine low-field acquisition, or on BraTS-Africa, is the next step and not a claim we make here.
 
-\section*{Preliminary results (synthetic proof of concept)}
+\section*{Results on real BraTS}
 
-We trained both super-resolution U-Nets and the segmentation U-Net on simulated low-field data and evaluated on a held-out synthetic set (n~$=$~64, disjoint from the training seed). These numbers are a proof of concept on simulated degradation, not a clinical result.
+We train and evaluate on the brain task of the Medical Segmentation Decathlon, which redistributes BraTS without a registration requirement. Splits are by patient, never by slice, because adjacent axial slices of one patient are near-duplicates and a slice-level split would place near-copies of training images into the test set.
 
-\textbf{Safety on the held-out set.} The tumor-aware objective roughly halves tumor erasure, and medium and large lesion erasure drops to zero.
+\textbf{Enhancing tumor, 71 held-out patients.} At equal segmentation quality the tumor-aware objective erases fewer lesions.
 
 \begin{center}
 \renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular}{@{}lccc@{}}
 \toprule
-\textbf{Metric} & \textbf{Distortion-optimal} & \textbf{Tumor-aware} \\
+\textbf{Metric} & \textbf{Low-resolution} & \textbf{Distortion-optimal} & \textbf{Tumor-aware} \\
 \midrule
-Tumor erasure rate & 27.8\% & \textbf{15.2\%} \\
-Small-lesion erasure rate & 88.2\% & \textbf{70.6\%} \\
-Dice & 0.576 & 0.481 \\
-PSNR (dB) & 26.23 & 19.89 \\
-False positive rate & 0.343 & 0.615 \\
-Uncertainty AUROC & 0.898 & 0.926 \\
+PSNR (dB) & 21.89 & 25.93 & 25.01 \\
+Dice & 0.628 & 0.696 & 0.692 \\
+Erasure rate (pooled) & 57.2\% & 49.7\% & \textbf{47.3\%} \\
+\quad small lesions & 74.6\% & 65.7\% & \textbf{62.7\%} \\
+False positive rate & 0.461 & \textbf{0.310} & 0.371 \\
+Uncertainty AUROC & --- & 0.852 & 0.818 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Two caveats we state plainly. In this raw comparison the tumor-aware PSNR is 6.3~dB lower, so it is not a matched-quality row; the matched-quality claim is the curve below. The false positive rate nearly doubles (0.34 to 0.62), so the tumor-aware model trades some hallucination for less erasure, a tradeoff a clinician should weigh.
+\textbf{The patient is the unit of analysis.} Pooled percentages count lesion cross-sections per slice, and one tumor spanning twenty slices contributes twenty correlated records. The 2,696 records here come from 71 patients, so pooling overstates precision by about 1.7 times. Recomputed with one rate per patient and a paired test: mean difference \textbf{$+3.2$ points}, 95\% CI $[+0.7, +6.9]$ from a patient-level bootstrap, $p = 0.007$; Wilcoxon $p = 0.010$. The objective helps 29 patients, hurts 11, and leaves 31 unchanged.
 
-\textbf{Quality-safety curve (matched quality).} Sweeping degradation severity and comparing at similar image quality, the tumor-aware model erases fewer lesions at every level, most clearly at moderate degradation.
+\textbf{Whole tumor: no benefit.} Repeating the identical pipeline with whole tumor as the target (10.9\% of the image, against 3.5\% for enhancing tumor) removes the effect entirely: 64.6\% against 63.7\% erasure, with worse Dice and worse hallucination. This is what the perception-distortion argument predicts. The objective is only misaligned when erasing the structure costs negligible reconstruction error, so a region covering a ninth of the image has nothing for a lesion-weighted term to correct. The size dependence is evidence for the mechanism rather than a caveat on it.
 
-\begin{center}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}lcc@{}}
-\toprule
-\textbf{Degradation} & \textbf{Distortion erasure} & \textbf{Tumor-aware erasure} \\
-\midrule
-$\times 3$ & 13.5\% & 1.9\% \\
-$\times 4$ & 25.0\% & 9.6\% \\
-$\times 5$ & 28.8\% & 23.1\% \\
-\bottomrule
-\end{tabular}
-\end{center}
+There is a second finding in that run. For whole tumor, both super-resolution models erase \textit{more} lesions than the degraded input they were given (64.6\% and 63.7\% against 61.5\%) while improving PSNR by more than 3~dB. Enhancement that improves every image-quality score can make the clinical finding harder to detect, which is this proposal's thesis in its strongest form, holding against our own fix as well as the baseline.
 
-This supports the central claim: at matched image quality the standard objective erases small tumors that the tumor-aware objective preserves, so PSNR is the wrong target for safe enhancement. The Monte Carlo dropout uncertainty map is predictive of error (AUROC near 0.9), and inference runs on CPU.
+\textbf{Honest limits.} The benefit is real but modest and not universal: the interval admits an effect as small as 0.7 points, and 11 of 71 patients are worse off. Both objectives still miss roughly two thirds of small enhancing lesions. Degradation is simulated from high-field scans, so a genuinely low-field acquisition remains untested.
 
 \section*{Feasibility and plan}
 

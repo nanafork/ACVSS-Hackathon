@@ -5,15 +5,18 @@ checkpoint provenance live in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## Blocking the presentation
 
-- [ ] **Paper results section is half-rewritten.** `tumor_aware_sr_paper.tex`
-      now carries the real ET and WT tables, but the abstract, discussion and
-      limitations still describe the synthetic study. PDFs not rebuilt.
-- [ ] **`proposal.tex` still has the old synthetic numbers** (27.8% → 15.2%,
-      PSNR 26.23/19.89). Those come from a checkpoint nothing in the repo
-      reproduces. They are the least defensible figures we have.
-- [ ] **Quality-safety sweep not rerun on real data.** `quality_safety_curve.png`
-      and the paper's sweep table are synthetic. Either regenerate with
-      `scripts/quality_safety_curve.py` against `demo_et.pt` or drop the claim.
+- [x] Paper, proposal and deck all carry the corrected real-BraTS numbers with
+      patient-level statistics; both PDFs rebuild clean
+- [ ] **Whole-tumor table is pre-audit.** It was produced before the dropout
+      leak was fixed and the slice cache needed to redo it died with the
+      sandbox. Marked provisional in the paper. Correcting it would, if
+      anything, strengthen the null it reports.
+- [ ] **`paper/tumor_aware_sr_paper.tex` discussion and limitations** still read
+      as though the study were synthetic. The results section is current; the
+      prose after it is not.
+- [ ] **Quality-safety sweep is still synthetic.** `quality_safety_curve.png`
+      and any sweep claim come from the phantom. Regenerate against
+      `demo_et.pt` or drop the claim.
 
 ## Demo
 
@@ -62,6 +65,26 @@ checkpoint provenance live in [EXPERIMENTS.md](EXPERIMENTS.md).
 - [ ] **`demo_gpu.pt` not downloaded.** Synthetic size-128 model; no
       evidentiary value given the phantom is degenerate. Probably let it go.
 - [ ] **The sandbox is ephemeral.** Anything still only on it is at risk.
+
+## Found in the 2026-07-28 audit
+
+- [x] Dropout leak in `src/evaluate.py` — every published safety number was
+      scored on stochastic reconstructions. Fixed; the ET erasure gap fell from
+      5.5 points to 2.4
+- [x] Lesions counted per slice, not per patient — significance was overstated
+      1.7×. Recomputed with a patient-level paired bootstrap
+- [x] `slices_per_case=12` used 8% of each volume and dropped 27% of patients
+- [ ] **`min_tumor_pixels` is applied before `center_crop`**, so a lesion near
+      the edge passes the filter and is then cropped away: 0.6% of slices carry
+      a label saying there is no tumor. Move the check after the crop.
+- [ ] **PSNR includes ~9% identical black background**, inflating both models
+      equally and making "matched quality" easier to claim than it should be.
+      Consider reporting PSNR inside the brain mask.
+- [ ] **`detect_thresh=0.1`** counts a lesion as detected when 10% of it is
+      covered. Lenient; erasure would look worse at a stricter threshold. Worth
+      a sensitivity curve over the threshold.
+- [ ] **Single seed** (`torch.manual_seed(0)`) in every run, so we have no
+      estimate of run-to-run variance. With an effect this size that matters.
 
 ## Open questions worth an experiment
 

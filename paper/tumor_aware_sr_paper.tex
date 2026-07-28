@@ -135,10 +135,10 @@ We evaluate on real brain MRI. Our data is the brain task of the Medical Segment
 The two runs below differ only in which nested region is treated as the lesion. This is the experiment that matters, because the perception-distortion argument is explicitly about structures small enough that erasing them costs negligible PSNR. Whole Tumor and Enhancing Tumor sit on opposite sides of that condition, covering 10.9\% and 3.5\% of the image respectively.
 
 \paragraph{Enhancing tumor: the objective matters.}
-Table~\ref{tab:main} reports 71 held-out patients and 2,696 lesions. The tumor-aware objective reduces erasure from 50.5\% to 45.0\%, and halves erasure of medium lesions from 8.6\% to 4.1\%. This is a matched-quality comparison in the way the claim requires: Dice is identical to within 0.001 (0.692 against 0.693) and PSNR differs by 0.7~dB, so the safety difference cannot be attributed to one model simply producing sharper images. With 2,696 lesions the standard error of a proportion near 0.5 is approximately 0.010, so a 5.5-point shift is well outside sampling noise. The cost is hallucination: the false positive detection rate rises from 0.324 to 0.436.
+Table~\ref{tab:main} reports 71 held-out patients. The tumor-aware objective reduces pooled erasure from 49.7\% to 47.3\% at equal segmentation quality: Dice differs by 0.004 and PSNR by 0.9~dB, so the safety difference cannot be attributed to one model simply producing sharper images. The cost is hallucination, with the false positive detection rate rising from 0.310 to 0.371.
 
 \begin{table}[h]
-  \caption{Enhancing tumor, held out on 71 unseen patients (664 slices, 2,696 lesions). PSNR, SSIM and Dice are quality; the remaining rows are safety. Lower erasure and lower false positive rate are safer.}
+  \caption{Enhancing tumor, held out on 71 unseen patients (664 slices). PSNR, SSIM and Dice are quality; the remaining rows are safety. Lower erasure and lower false positive rate are safer. Erasure percentages are pooled over lesion cross-sections; see Table~\ref{tab:patient} for the patient-level analysis these should be read against.}
   \label{tab:main}
   \centering
   \renewcommand{\arraystretch}{1.15}
@@ -146,19 +146,46 @@ Table~\ref{tab:main} reports 71 held-out patients and 2,696 lesions. The tumor-a
     \toprule
     \textbf{Metric} & \textbf{Low-resolution} & \textbf{Distortion-optimal} & \textbf{Tumor-aware} \\
     \midrule
-    PSNR (dB)                  & 21.89 & 25.42 & 24.73 \\
-    Dice                       & 0.628 & 0.692 & 0.693 \\
-    \FNER                      & 57.2\% & 50.5\% & \textbf{45.0\%} \\
-    \quad small lesions        & 74.6\% & 66.7\% & \textbf{59.8\%} \\
-    \quad medium lesions       & 16.4\% & 8.6\%  & \textbf{4.1\%} \\
+    PSNR (dB)                  & 21.89 & 25.93 & 25.01 \\
+    SSIM                       & 0.545 & 0.792 & 0.762 \\
+    Dice                       & 0.628 & 0.696 & 0.692 \\
+    \FNER (pooled)             & 57.2\% & 49.7\% & \textbf{47.3\%} \\
+    \quad small lesions        & 74.6\% & 65.7\% & \textbf{62.7\%} \\
+    \quad medium lesions       & 16.4\% & 8.6\%  & \textbf{6.4\%} \\
     \quad large lesions        & 1.3\%  & 0.4\%  & \textbf{0.2\%} \\
-    False positive rate        & 0.461 & \textbf{0.324} & 0.436 \\
+    False positive rate        & 0.461 & \textbf{0.310} & 0.371 \\
+    Uncertainty AUROC          & --    & 0.852 & 0.818 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{The patient, not the lesion, is the unit of analysis.}
+The pooled percentages above count connected components per axial slice. A tumor spanning twenty slices contributes twenty lesion records whose outcomes are near-perfectly correlated: if a reconstruction loses that tumor, it loses it on every slice. The 2,696 records in this test set come from only 71 patients, roughly 38 each, so treating them as independent samples overstates precision. Measured directly, the clustered standard error is 1.7 times the value a naive independence assumption gives.
+
+Table~\ref{tab:patient} therefore recomputes the comparison with one erasure rate per patient and a paired test across patients. The effect survives and remains significant, but the interval is wide and the benefit is not universal: 11 of 71 patients are worse off under the tumor-aware objective.
+
+\begin{table}[h]
+  \caption{Patient-level analysis, 71 held-out patients. Each patient contributes one erasure rate per objective and the test is paired. The bootstrap resamples patients, not lesions.}
+  \label{tab:patient}
+  \centering
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}lc@{}}
+    \toprule
+    \textbf{Quantity} & \textbf{Value} \\
+    \midrule
+    Mean per-patient erasure, distortion-optimal & 0.416 \\
+    Mean per-patient erasure, tumor-aware        & \textbf{0.384} \\
+    Mean paired difference                       & \textbf{$+3.2$ points} \\
+    95\% CI (patient bootstrap, $10^4$ resamples)& $[+0.7, +6.9]$ \\
+    Two-sided bootstrap $p$                      & 0.007 \\
+    Wilcoxon signed-rank $p$                     & 0.010 \\
+    Patients helped / hurt / unchanged           & 29 / 11 / 31 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \paragraph{Whole tumor: the objective does not matter.}
-Repeating the identical pipeline with Whole Tumor as the target gives Table~\ref{tab:curve}. The effect disappears. Erasure is 64.6\% against 63.7\%, a difference under one percentage point across 5,128 lesions, and the tumor-aware model is slightly worse on Dice and clearly worse on hallucination.
+Repeating the identical pipeline with Whole Tumor as the target gives Table~\ref{tab:curve}. The effect disappears. Erasure is 64.6\% against 63.7\%, a difference under one percentage point, and the tumor-aware model is slightly worse on Dice and clearly worse on hallucination. We flag one caveat on this table: it was produced before we corrected an evaluation defect that had left dropout active during scoring, and the slice cache needed to regenerate it was lost with the compute instance. Correcting that defect on the Enhancing Tumor run reduced the apparent tumor-aware advantage, so a corrected Whole Tumor table would if anything strengthen the null reported here. We state the numbers as measured and mark them provisional.
 
 \begin{table}[h]
   \caption{Whole tumor, held out on 92 unseen patients (1,074 slices, 5,128 lesions). The lesion-weighted objective produces no safety benefit for a region covering 10.9\% of the image.}
