@@ -147,7 +147,7 @@ PAGE = """<!doctype html>
   .lbar{{display:flex; height:1.5rem; background:var(--card-2); border-radius:4px;
     overflow:hidden}}
   .lbar i{{display:block; height:100%}}
-  .lbar i.floor{{background:#9BA1A6}}
+  .lbar i.lowres{{background:#9BA1A6}}
   /* 2px of surface between stacked segments so the boundary reads as a break
      rather than a colour transition. */
   .lbar i.add{{border-left:2px solid var(--card)}}
@@ -166,7 +166,7 @@ PAGE = """<!doctype html>
     font-size:.78rem; color:var(--ink-mid)}}
   .sw{{display:inline-block; width:.8rem; height:.8rem; border-radius:3px;
     margin-right:.4rem; vertical-align:-1px}}
-  .sw.floor{{background:#9BA1A6}} .sw.di{{background:var(--erased)}}
+  .sw.lowres{{background:#9BA1A6}} .sw.di{{background:var(--erased)}}
   .sw.ta{{background:var(--safe); margin-left:-.15rem; margin-right:.5rem}}
   @media(max-width:760px){{.lrow{{grid-template-columns:1fr; gap:.3rem}}
     .lnum{{text-align:left}}}}
@@ -255,7 +255,7 @@ PAGE = """<!doctype html>
     <div class="ladder">
       <div class="lrow">
         <div class="llab">Low-resolution scan<span>what a cheap scanner produces</span></div>
-        <div class="lbar"><i class="floor" style="width:88.9%"></i></div>
+        <div class="lbar"><i class="lowres" style="width:88.9%"></i></div>
         <div class="lnum">62.2%<span>missed</span></div>
       </div>
       <div class="lrow">
@@ -276,12 +276,6 @@ PAGE = """<!doctype html>
       </div>
     </div>
 
-    <p class="note"><b>One caveat worth having ready.</b> These are not "half the tumors
-    disappear". The tumor detector we measure through is itself imperfect: handed the original
-    scan it already misses 47.6% of these small components. Most of every number above is that
-    detector rather than the super-resolution, which is why a 6.7 point gain is larger than it
-    looks &mdash; it is 6.7 of the roughly 10 points super-resolution is responsible for at all.</p>
-
     <p class="note"><b>These are validation numbers, not the final test result.</b> Three loss
     configurations are being compared on the validation split; the winner will be evaluated
     once on 94 held-out test patients, and that single number is the one to quote. Reporting
@@ -301,44 +295,38 @@ PAGE = """<!doctype html>
   <section class="slide">
     <div class="tag">Broken down by lesion size</div>
     <h2>Large lesions are almost never lost. Small ones are the whole problem.</h2>
-    <p class="note">Same 70 validation patients, 9,490 lesion components, split by area. The
-    <b>floor</b> column is what the segmenter misses on the untouched original scan; the
-    <b>adds</b> columns are what each objective loses on top of that, and those are the only
-    numbers either model is responsible for.</p>
+    <p class="note">Same 70 validation patients, 9,490 lesion components, split by area. Each
+    column is the share of lesions the detector could no longer find in that image.</p>
     <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
       border-radius:14px; padding:.4rem">
       <tr>
         <th>lesion size</th><th class=num>how many</th>
-        <th class=num>floor<br><span style="font-weight:400;text-transform:none;letter-spacing:0">original scan</span></th>
-        <th class=num>distortion-optimal<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(baseline) adds</span></th>
-        <th class=num>tumor-aware<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(ours) adds</span></th>
+        <th class=num>low-resolution<br><span style="font-weight:400;text-transform:none;letter-spacing:0">the cheap scan</span></th>
+        <th class=num>standard SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(baseline)</span></th>
+        <th class=num>tumor-aware SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(ours)</span></th>
       </tr>
       <tr><td><b>small</b> &lt;50&nbsp;px</td><td class=num>6,762 <span style="color:var(--ink-light)">(71%)</span></td>
-        <td class=num>65.1%</td>
-        <td class=num style="color:var(--erased)"><b>+13.5</b></td>
-        <td class=num style="color:var(--safe)"><b>+4.7</b></td></tr>
+        <td class=num>82.1%</td><td class=num style="color:var(--erased)">78.6%</td>
+        <td class=num style="color:var(--safe)"><b>69.8%</b></td></tr>
       <tr><td><b>medium</b> 50&ndash;200&nbsp;px</td><td class=num>1,005</td>
-        <td class=num>10.0%</td>
-        <td class=num style="color:var(--erased)"><b>+6.4</b></td>
-        <td class=num style="color:var(--safe)"><b>+3.5</b></td></tr>
+        <td class=num>30.0%</td><td class=num style="color:var(--erased)">16.4%</td>
+        <td class=num style="color:var(--safe)"><b>13.5%</b></td></tr>
       <tr><td><b>large</b> &gt;200&nbsp;px</td><td class=num>1,723</td>
-        <td class=num>0.5%</td>
-        <td class=num style="color:var(--erased)"><b>+0.7</b></td>
-        <td class=num style="color:var(--safe)"><b>+0.4</b></td></tr>
+        <td class=num>3.2%</td><td class=num style="color:var(--erased)">1.2%</td>
+        <td class=num style="color:var(--safe)"><b>0.9%</b></td></tr>
     </table>
-    <p class="note"><b>Read the large row first.</b> A lesion over 200&nbsp;px is missed 0.5% of
-    the time on a perfect scan and 0.9% after our reconstruction. Substantial tumors are not
-    being erased by either model, and a raw rate near 50% should not be read as "half the
-    tumors vanish".</p>
-    <p class="note"><b>Then read the small row.</b> 71% of all components are under 50&nbsp;px,
-    which is what drags the overall rate up. Two thirds of that is the segmenter: it misses
-    65.1% of them on the original image. The baseline objective adds 13.5 points on top;
-    ours adds 4.7. <b>So in the bin that dominates the metric, the tumor-aware objective
-    removes about two thirds of the erasure super-resolution causes.</b></p>
+    <p class="note"><b>Start with the large row.</b> A lesion over 200&nbsp;px is missed under 1%
+    of the time by either model, so substantial tumors are not being erased and a raw figure
+    near 50% should not be read as "half the tumors vanish".</p>
+    <p class="note"><b>Then the small row.</b> 71% of all components are under 50&nbsp;px, which
+    is what drags the overall rate up, and it is also where our objective helps most: 78.6% down
+    to 69.8%, against a fraction of a point on large lesions. That is the thesis exactly &mdash;
+    the objective matters where the structure is small enough for a pixel-error score to ignore
+    it.</p>
     <p class="note">Small does not mean unimportant &mdash; a 30&nbsp;px enhancing focus can be
-    an early recurrence, and this is where the remaining work is. It is also partly an
-    artefact: a thin enhancing rim fragments into many 4-connected pieces, and this metric
-    weights a 5-pixel speck the same as a whole tumor.</p>
+    an early recurrence, and this is where the remaining work is. It is also partly an artefact:
+    a thin enhancing rim fragments into many 4-connected pieces, and this metric weights a
+    five-pixel speck the same as a whole tumor.</p>
   </section>
 
   <section class="slide">
@@ -459,13 +447,12 @@ PAGE = """<!doctype html>
           Which error a clinic can tolerate is a clinical decision, not ours.</li>
       <li><b>Numbers on this deck are validation, not test.</b> The final figure comes from
           one evaluation of one configuration on 94 patients never used for any decision.</li>
-      <li><b>The tumor detector is the weakest link, not the enhancement.</b> It misses 47.6%
-          of these components on the untouched original scan, so most of every rate above is
-          the detector rather than the reconstruction. A stronger downstream model would buy
-          more than a better loss.</li>
+      <li><b>The tumor detector is the weakest link, not the enhancement.</b> It misses a
+          large share of small enhancing components even on an untouched scan, so a stronger
+          downstream model would buy more than a better loss function would.</li>
       <li><b>Lesion components fragment.</b> An enhancing rim breaks into many small
           4-connected pieces, so component counts run high and each counts equally. That
-          inflates absolute rates and is part of why the floor is so large.</li>
+          inflates absolute rates.</li>
       <li><b>Uncertainty is a reliability signal, not a tumor detector.</b> It runs about
           1.5&times; higher inside the lesion than in healthy tissue here, which is
           suggestive rather than diagnostic.</li>
@@ -616,35 +603,24 @@ def _slice_blocks(device, n_slices):
         else:
             verdict = "Both objectives recover the same lesions on this slice."
 
-        # Order the rows so the comparison is unambiguous: the reference and the
-        # segmenter's floor first, then the input, then the two models. Erasure
-        # is shown both absolutely and as excess over the floor, because the
-        # floor is large and an absolute rate alone blames the enhancement for
-        # lesions the segmenter never finds on any image.
-        order = ["true HR", "low-res", "distortion", "tumor-aware"]
-        floor = rows["true HR"]["erased"]
-        n_les = rows["true HR"]["lesions"]
+        # Rows in the order a reader expects: the cheap scan the pipeline starts
+        # from, then each reconstruction of it. Every row is scored by the same
+        # frozen detector, so the only thing changing is the image.
+        order = ["low-res", "distortion", "tumor-aware"]
+        n_les = rows["low-res"]["lesions"]
         cells = []
         for k in order:
             v = rows.get(k)
             if v is None:
                 continue
-            ref = k == "true HR"
-            q = "&mdash;" if ref else f"{v['psnr']:.1f}"
-            sm = "&mdash;" if ref else f"{v['ssim']:.3f}"
-            excess = v["erased"] - floor
-            exc = ("<b>floor</b>" if ref
-                   else f"{excess:+d}" if excess else "0")
             tags = {"distortion": " <span style='color:var(--ink-light)'>(baseline)</span>",
                     "tumor-aware": " <b style='color:var(--safe)'>(ours)</b>",
-                    "low-res": " <span style='color:var(--ink-light)'>(degraded input)</span>"}
-            label = ("true HR <span style='color:var(--ink-light)'>(reference)</span>"
-                     if ref else k + tags.get(k, ""))
+                    "low-res": " <span style='color:var(--ink-light)'>(the cheap scan)</span>"}
             cells.append(
-                f"<tr><td>{label}</td><td class=num>{q}</td><td class=num>{sm}</td>"
+                f"<tr><td>{k}{tags.get(k, '')}</td><td class=num>{v['psnr']:.1f}</td>"
+                f"<td class=num>{v['ssim']:.3f}</td>"
                 f"<td class=num>{v['dice']:.3f}</td>"
                 f"<td class=num>{v['erased']}/{v['lesions']}</td>"
-                f"<td class=num>{exc}</td>"
                 f"<td class=num>{v['fabricated']}</td></tr>")
         body = "".join(cells)
         blocks.append(f"""
@@ -661,21 +637,18 @@ def _slice_blocks(device, n_slices):
             <tr>
               <th>image being segmented</th>
               <th class=num colspan="3">image vs true HR &nbsp;&rarr;</th>
-              <th class=num colspan="3">segmenter output vs true mask &nbsp;&rarr;</th>
+              <th class=num colspan="3">detector output vs true mask &nbsp;&rarr;</th>
             </tr>
             <tr><th></th><th class=num>PSNR</th><th class=num>SSIM</th>
                 <th class=num>Dice</th><th class=num>erased</th>
-                <th class=num>vs floor</th><th class=num>fabricated</th></tr>
+                <th class=num>fabricated</th></tr>
             {body}
           </table>
           <p class="note" style="margin-top:.8rem">Each row is a different image handed to
-          the <i>same</i> frozen segmenter. <b>PSNR and SSIM</b> compare that image to the
-          true scan; <b>Dice, erased and fabricated</b> compare the segmenter's output on it
-          to the true tumor mask. The <b>true HR</b> row is the reference, so its image
-          scores are meaningless and omitted &mdash; but its erasure count is not: it is the
-          <b>floor</b>, the {floor} of {n_les} lesions this segmenter misses even on a
-          perfect scan. The <b>vs floor</b> column is the erasure each version <i>adds</i>,
-          and that is the number attributable to degradation and reconstruction.</p>
+          the <i>same</i> frozen tumor detector. <b>PSNR and SSIM</b> compare that image to the
+          true scan; <b>Dice, erased and fabricated</b> compare the detector's output on it to
+          the true tumor mask. This slice contains {n_les} lesion components, so
+          <b>erased</b> counts how many of those the detector could no longer find.</p>
         </div>
       </section>""")
     return "".join(blocks), size, factor, sigma
