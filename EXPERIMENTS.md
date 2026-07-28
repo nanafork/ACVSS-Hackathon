@@ -15,7 +15,7 @@ comparable, and conflating them is the single easiest way to mislead a judge.
 | | |
 |---|---|
 | Checkpoint the local demo uses | `checkpoints/demo.pt` (run 2, **synthetic**) |
-| Best real-data checkpoint | `demo_brats.pt` (run 4, on the sandbox, **not transferred**) |
+| Best real-data checkpoint | `checkpoints/demo_brats.pt` (run 4) — downloaded, md5 verified, loads and runs locally |
 | Does the headline claim hold on real data? | **Not demonstrated.** See run 4. |
 | Numbers currently in `paper/` | From an unreproducible older run. **Unverified.** |
 | Numbers currently in the deck | Run 2 (synthetic). Labelled as synthetic. |
@@ -85,8 +85,9 @@ instability is itself evidence the synthetic numbers are not load-bearing.
 | Prep | `prepare_msd.py --region wt --size 128` → 5,259 slices from 460 cases |
 | Split | **By patient**: 368 train / 92 test, zero case overlap (asserted) |
 | Command | `train_demo.py --cached slices_128.npz --size 128 --seg-epochs 40 --sr-epochs 60 --weight 40` |
-| Checkpoint | `demo_brats.pt` (sandbox only, **not transferred**) |
+| Checkpoint | `checkpoints/demo_brats.pt` (committed; md5 `d765a893fcc2d6d2b2891dd53ae90c73`) |
 | Held-out | 1,074 slices, 92 unseen patients, 5,128 lesions |
+| Raw results | `results/brats_wt_heldout.json` |
 
 | metric | low-res | distortion | tumor-aware |
 |---|---|---|---|
@@ -96,6 +97,10 @@ instability is itself evidence the synthetic numbers are not load-bearing.
 | FNER | 0.615 | 0.646 | 0.637 |
 | FPDR | 0.711 | **0.482** | 0.596 |
 | AUROC | — | 0.846 | 0.819 |
+
+Re-run independently after downloading the checkpoint, to check the result was
+not an artifact of MC-dropout randomness. It reproduces: FNER 0.645 / 0.637,
+FPDR 0.478 / 0.595, Dice 0.633 / 0.624. The finding is stable.
 
 **The central claim does not replicate.** Erasure 0.646 vs 0.637 is under one
 percentage point over 5,128 lesions. It goes the wrong way on medium lesions
