@@ -119,11 +119,14 @@ all.
 
 \subsection*{Is a rate near 50\% bad? Split it by lesion size}
 
+The second column counts how many lesions of that size the 70 test patients contain in total.
+The last three give the share of them the detector could no longer find in each image.
+
 \begin{center}\small
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Lesion size} & \textbf{How many} & \textbf{Low-resolution} & \textbf{Baseline} & \textbf{Ours} \\
+\textbf{Lesion size} & \textbf{Lesions of this size} & \textbf{Low-resolution} & \textbf{Baseline} & \textbf{Ours} \\
 \midrule
 Small, $<50$ px    & 6{,}762 (71\%) & 82.1\% & 78.6\% & \textbf{69.8\%} \\
 Medium, 50--200 px & 1{,}005        & 30.0\% & 16.4\% & \textbf{13.5\%} \\
