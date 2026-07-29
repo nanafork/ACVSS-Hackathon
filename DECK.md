@@ -70,43 +70,66 @@ costs more credibility than not having one.
 
 Only the lines that are hard to improvise. Everything else is on the screen.
 
-**1 and 2. The opening.** Roughly 50 seconds for both. The hook goes first,
-before any introduction, because the first sentence is the only one the room is
-guaranteed to hear.
+**1 and 2. The opening.** About 60 seconds for both. The hook is a question to
+the room, asked before any introduction, because the first sentence is the only
+one the audience is guaranteed to hear.
 
-> How would you know if the model that cleaned up your MRI had quietly removed
-> your tumor?
+> Can you guess how many MRI scanners there are in Ghana?
 >
-> *(pause. let it sit)*
+> *(let someone answer. whatever they say, it is too high)*
 >
-> We are five engineers, our names are on the slide, and we spent this hackathon
-> answering that with numbers instead of opinions.
+> Fourteen. For more than thirty million people. And two thirds of them are in
+> Greater Accra, so if you do not live in the capital, the real number where you
+> are is closer to zero.
 >
 > *(slide 2)*
 >
-> Here is why the question is worth asking. Across much of sub Saharan Africa
-> there is less than one MRI scanner per million people. In high income countries
-> it is up to thirty seven. That gap does not get closed by buying more three
-> tesla machines.
+> Across much of sub Saharan Africa there is less than one scanner per million
+> people. In high income countries it is up to thirty seven. That gap will not be
+> closed by three tesla machines: they need a shielded room, a cooling supply and
+> power that does not fail.
 >
 > *(pause)*
 >
-> Portable low field scanners do close it. They run at about fifty five
-> millitesla, roughly a fiftieth of a hospital magnet, cheap enough to put in a
-> district hospital. They are deployable, and their images are blurry and noisy.
+> It will be closed by portable low field scanners. They run at about fifty five
+> millitesla, roughly a fiftieth of the strength of a hospital magnet, cheap
+> enough and robust enough to be wheeled to a district clinic.
 >
-> So the bottleneck moves from the scanner to the image it produces, and the
-> accepted way to fix the image is deep learning super resolution: train on
-> high field scans, then sharpen the cheap one. That bridge is where our question
-> starts.
+> They come with a clinical cost. A weaker magnet means a weaker signal, so the
+> fine detail, the high frequencies in k-space, is buried in noise and never
+> really recovered. The image comes out blurry and grainy.
+>
+> The accepted fix is deep learning super resolution: train on high field scans,
+> then sharpen the cheap one. **That fix is where our question starts.**
 
-Optional lighter line if the room is stiff, in place of the second sentence:
-"five engineers, one GPU and a suspicion." Use it or drop it, but do not stack it
-on top of the hook. The hook works because nothing follows it for a beat.
+**Do not say "and this is where our solution comes in" here.** The next slide is
+the problem, not the answer: it shows that the metric everyone trains on prefers
+a scan with the tumor deleted. Promising the solution and then showing a
+complication makes the deck feel like it doubled back. Hand over to the problem
+instead, which is what the last line does.
 
-Delivery: the hook is a question to the room, so look up and do not rush it. Give
-the two scanner numbers slowly, one beat apart, and let the slide carry the
-digits; you do not need to say "per million" twice. Do not read the three cards.
+Two accuracy notes. **Ghana has about fourteen scanners, not two**: 0.48 per
+million, the highest in West Africa, from Ogbole et&nbsp;al., Pan African Medical
+Journal 2018 and the 2017 Ghana audit. Two would be wrong by sevenfold and it is
+exactly the kind of number a judge from the region can correct in the Q&A, which
+costs more than the hook is worth. The Accra concentration is the honest version
+of the same point and it lands harder.
+
+And the k-space line is a simplification. A low field scanner is not unable to
+sample high frequencies in principle; its signal to noise ratio is so much lower
+that the high frequency lines are not worth acquiring, and the voxels are larger
+to compensate. If pushed: "signal to noise scales with field strength, so at
+fifty five millitesla the high frequency detail is not affordable. We simulate
+that with k-space truncation plus Rician noise, which reproduces resolution loss
+and noise but not the contrast change of a real low field magnet."
+
+Optional lighter line if the room is stiff, after the fourteen: "five engineers,
+one GPU and a suspicion." Use it or the hook, not both. The hook works because
+nothing follows it for a beat.
+
+Delivery: ask the question and actually wait. Give the two comparison numbers a
+beat apart and let the slide carry the digits. Do not read the three cards. If
+you are over time, cut the sentence about shielded rooms and power.
 
 **3. The problem.** This is the slide the talk turns on, so land it slowly.
 "We took the true scan, painted the tumor out with surrounding brain, and scored
