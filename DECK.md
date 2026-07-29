@@ -36,10 +36,10 @@ the cumulative column is where you should be as you leave the slide.
 | # | Slide (assertion headline) | Evidence on screen | Time | Cum. |
 |---|---|---|---|---|
 | 1 | When sharper means blind | title, five names and roles | 0:10 | 0:10 |
-| 2 | Cheap, low quality scanners are the only realistic way to widen MRI access | under 1 scanner per million vs 37, and 0.055 T | 0:40 | 0:50 |
-| 3 | A forgery with the tumor painted out scores better than either reconstruction we train | 3 row table: forgery 28.8 dB / 0.978, baseline 24.5 / 0.778, ours 24.3 / 0.764 | 0:55 | 1:45 |
-| 4 | We measure the erasure that a quality metric hides, then train against it | three contribution cards | 0:35 | 2:20 |
-| 5 | Degrade a real scan, reconstruct it two ways, and ask one frozen detector what it can still find | four step pipeline | 0:45 | 3:05 |
+| 2 | Cheap, low quality scanners are the only realistic way to widen MRI access | Ghana's 14 scanners, under 1 per million vs up to 37, and 0.055 T | 0:50 | 1:00 |
+| 3 | A forgery with the tumor painted out scores better than either reconstruction we train | 3 row table: forgery 28.8 dB / 0.978, baseline 24.5 / 0.778, ours 24.3 / 0.764 | 0:50 | 1:50 |
+| 4 | We measure the erasure that a quality metric hides, then train against it | three contribution cards | 0:35 | 2:25 |
+| 5 | Degrade a real scan, reconstruct it two ways, and ask one frozen segmentation network what it can still find | the architecture figure | 0:40 | 3:05 |
 | 6 | Super resolution recovers tumor the degradation destroys. Ours recovers more of it | the three bar erasure ladder, 62.2 / 58.0 / 51.3 | 1:15 | 4:20 |
 | 7 | Large lesions are almost never lost. Small ones are the whole problem | erasure by lesion size | 0:50 | 5:10 |
 | 8 | The lesions the baseline loses show up in 3D as empty blue shells | four 3D viewports, **this is the demo** | 0:50 | 6:00 |

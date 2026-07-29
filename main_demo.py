@@ -289,6 +289,9 @@ PAGE = """<!doctype html>
     margin-top:2.2rem}}
 
   .vitals{{display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:1.4rem}}
+  .vitals.four{{grid-template-columns:repeat(4,1fr); gap:.8rem}}
+  .vitals.four .vital{{padding:1.1rem}}
+  .vitals.four .v{{font-size:clamp(1.7rem,4vw,2.4rem)}}
   .vital{{background:var(--card); border:1px solid var(--border); border-radius:14px;
     padding:1.3rem}}
   .vital .k{{font-family:var(--mono); font-size:.68rem; letter-spacing:.14em;
@@ -421,20 +424,28 @@ PAGE = """<!doctype html>
   <section class="slide">
     <div class="tag"><span class="sec">01</span>Why this matters</div>
     <h2>Cheap, low-quality scanners are the only realistic way to widen MRI access.</h2>
-    <div class="vitals">
+    <div class="vitals four">
+      <div class="vital"><div class="k">Ghana</div>
+        <div class="v" style="color:var(--erased)">14<span class="u">scanners</span></div>
+        <div class="d">for more than 30 million people, and two thirds of them sit in
+          Greater Accra</div></div>
       <div class="vital"><div class="k">Sub-Saharan Africa</div>
-        <div class="v" style="color:var(--erased)">&lt;1<span class="u">scanner per million</span></div>
+        <div class="v" style="color:var(--erased)">&lt;1<span class="u">per million</span></div>
         <div class="d">MRI is scarce where the disease burden is not</div></div>
       <div class="vital"><div class="k">High-income countries</div>
         <div class="v" style="color:var(--ink-mid)">37<span class="u">per million</span></div>
         <div class="d">up to this many, for the same imaging need</div></div>
       <div class="vital safe"><div class="k">The route in</div>
         <div class="v" style="color:var(--safe)">0.055<span class="u">tesla</span></div>
-        <div class="d">portable low-field scanners are deployable, and their images are
-          blurry and noisy</div></div>
+        <div class="d">portable, robust enough to move, and about a fiftieth of a
+          hospital magnet</div></div>
     </div>
-    <p class="note">The bottleneck moves from the scanner to the image it produces, and
-    super-resolution is the accepted bridge. Anazodo et&nbsp;al., Nature Communications 2024.</p>
+    <p class="note">A weaker magnet means a weaker signal, so the high frequencies in
+    k-space are buried in noise: the image comes out blurry and grainy. The accepted fix
+    is super-resolution, and <b>that fix is where our question starts</b>.</p>
+    <p class="note">Ghana counts from the West Africa MRI survey (Ogbole et&nbsp;al., Pan
+    African Medical Journal 2018) and the 2017 Ghana audit; regional figures from Anazodo
+    et&nbsp;al., Nature Communications 2024.</p>
   </section>
 
   <section class="slide">
