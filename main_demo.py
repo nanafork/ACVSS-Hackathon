@@ -258,6 +258,9 @@ def _floor_chart() -> str:
     ax.set_axisbelow(True)
     ax.legend(fontsize=8, frameon=False, loc="upper right", handlelength=1.2)
     fig.tight_layout()
+    import os
+    os.makedirs("figures", exist_ok=True)
+    fig.savefig("figures/floor_by_size.png", dpi=160, facecolor="white")
     return (f'<figure class="chart"><img src="data:image/png;base64,{_fig_to_b64(fig)}" '
             f'alt="erasure by lesion size: the segmenter\'s floor on the untouched scan, '
             f'plus the excess each objective adds"></figure>')
@@ -454,7 +457,7 @@ PAGE = """<!doctype html>
      difference between a preserved and an erased lesion stopped being legible. */
   /* all four viewports in one row: they are read side by side, not scrolled */
   .panels{{display:grid; grid-template-columns:repeat(4,1fr); gap:.7rem; margin-top:1.1rem}}
-  .panels figcaption{{font-size:.66rem; padding:.45rem .55rem; line-height:1.3}}
+  .panels figcaption{{font-size:.82rem; padding:.6rem .7rem; line-height:1.35}}
   figure{{margin:0; border:1px solid var(--border); border-radius:14px; overflow:hidden;
     background:var(--card)}}
   figure img{{display:block; width:100%; height:auto; background:var(--navy)}}
@@ -623,23 +626,19 @@ PAGE = """<!doctype html>
   <section class="slide">
     <div class="tag"><span class="sec">03</span>Contribution</div>
     <h2>Penalise the model heavily for mistakes where the tumor is.</h2>
-    <div class="terms">
+    <div class="terms" style="grid-template-columns:repeat(2,1fr)">
+      <div class="term" style="border-left-color:var(--true)">
+        <h3>How we degrade</h3>
+        <p>We take a real high-field scan and throw away the fine detail a cheap scanner
+        cannot capture, then add noise. Every blurry input still has its true scan to be
+        judged against.</p></div>
       <div class="term" style="border-left-color:var(--safe)">
-        <h3>The loss</h3>
-        <p>Pixel error inside the tumor mask is <b>multiplied by a factor</b>, so an error on
-        the lesion costs far more than the same error in healthy tissue.</p>
-        <p><code>L = |pred &minus; true| &times; (1 + w&middot;mask)</code>, w=40</p></div>
-      <div class="term" style="border-left-color:var(--erased)">
-        <h3>The second term</h3>
-        <p>Supervises the <b>segmenter's output</b> rather than the pixels, so inventing a
-        tumor is punished as well as losing one.</p></div>
-      <div class="term">
-        <h3>The readout</h3>
-        <p>Lesions <b>erased</b> and <b>fabricated</b>, split by size, always against what the
-        segmenter already misses on an untouched scan.</p></div>
+        <h3>The tumor-aware loss</h3>
+        <p>A mistake inside the tumor costs the model far more than the same mistake in
+        healthy tissue. It can no longer buy score by smoothing a lesion away.</p></div>
     </div>
-    <p class="note">The model can no longer buy score by smoothing a lesion away.
-    Corrective, not architectural: no new network, three small U-Nets.</p>
+    <p class="note">Same network, same data. The only thing we changed is what it is
+    punished for.</p>
   </section>
 
   <section class="slide">
@@ -665,27 +664,9 @@ PAGE = """<!doctype html>
         <div class="v">51.3<span class="u">%</span></div>
         <div class="d">&minus;6.7 points vs baseline, at matched quality</div></div>
     </div>
-    <div class="ladder">
-      <div class="lrow">
-        <div class="llab">The degraded scan<span>a real scan we degraded to imitate a cheap scanner</span></div>
-        <div class="lbar"><i class="deg" style="width:88.9%"></i></div>
-        <div class="lnum">62.2%<span>missed</span></div>
-      </div>
-      <div class="lrow">
-        <div class="llab">Standard super-resolution <span style="display:inline;font-weight:600;color:var(--ink-mid)">(baseline)</span><span>trained only for image quality</span></div>
-        <div class="lbar"><i class="base" style="width:82.9%"></i></div>
-        <div class="lnum">58.0%<span>missed</span></div>
-      </div>
-      <div class="lrow">
-        <div class="llab">Tumor-aware super-resolution <span style="display:inline;font-weight:700;color:var(--safe)">(OURS)</span><span>our objective: lesion-weighted loss</span></div>
-        <div class="lbar"><i class="ours" style="width:73.3%"></i></div>
-        <div class="lnum">51.3%<span><b style="color:var(--safe)">&minus;6.7</b> vs baseline</span></div>
-      </div>
-      <div class="lscale"><div><span>0%</span>
-        <span class="mid">of enhancing lesion components missed</span><span>70%</span></div></div>
-      <div class="lkey">
-        <span>Same frozen segmenter in all three rows: only the image changes.</span>
-      </div>
+    {floor_chart}
+    <p class="note">Grey is what the frozen segmenter misses on the <b>untouched</b> scan.
+    The block above it is what each objective adds: standard SR in orange, ours in green.</p>
     </div>
 
   </section>
