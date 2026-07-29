@@ -238,58 +238,61 @@ CSS = """
 
   /* ---- the figure canvas: a printed academic figure, black ink on white ---- */
   .figure{background:#fff; border:1px solid var(--rule); border-radius:6px;
-    padding:2rem 1.6rem 1.4rem; margin-top:1.2rem; overflow-x:auto;
-    color:#14161A}
-  .fig-inner{min-width:940px}
+    padding:1.8rem 1.4rem 1.2rem; margin-top:1.2rem; overflow-x:auto;
+    color:#14161A; position:relative; left:50%; transform:translateX(-50%);
+    width:min(1420px, calc(100vw - 2.6rem))}
+  .fig-inner{min-width:1300px}
+  .sweep{display:block; position:relative; z-index:2; margin-top:64px}
 
-  /* ---- exploded stack: plates on the left, a numbered legend on the right ----
-     Flexbox throughout: the stack is a column of levels, each level a row of
-     [plate | legend]. The dotted verticals are the alignment guides an exploded
-     axonometric uses to say "these are the same object, pulled apart". */
-  .stack{display:flex; flex-direction:column; position:relative}
-  .level{display:flex; align-items:center; gap:2.2rem; padding:.55rem 0}
-  .plate{flex:0 0 430px; width:430px; display:flex; align-items:center;
-    justify-content:flex-start; gap:.7rem; position:relative}
-  .pcol{flex:0 0 176px; width:176px}
-  .pcol.small{flex:0 0 140px; width:140px}
-  /* the guides: two hairlines running the height of the stack, behind the plates */
-  .stack::before,.stack::after{content:""; position:absolute; top:14px; bottom:14px;
-    width:0; border-left:1px dotted #9A9EA4; z-index:0}
-  .stack::before{left:6px}
-  .stack::after{left:424px}
+  /* ---- exploded stack, landscape ----------------------------------------
+     Flexbox throughout: the stack is a row of stages, each stage a column of
+     [plate | 2D panels | numbered legend]. The dotted horizontals are the
+     alignment guides an exploded axonometric uses to say "these are the same
+     object, pulled apart", turned on their side with the layout. */
+  .stack{display:flex; flex-direction:row; align-items:flex-start;
+    justify-content:center; position:relative}
+  .level{flex:0 0 280px; width:280px; display:flex; flex-direction:column}
+  .plate{height:216px; display:flex; align-items:center; justify-content:center;
+    gap:.6rem; position:relative}
+  .pcol{flex:0 0 auto; max-width:176px}
+  .pcol.small{max-width:128px}
+  /* the guides: two hairlines running the width of the stack, behind the plates */
+  .stack::before,.stack::after{content:""; position:absolute; left:4px; right:4px;
+    height:0; border-top:1px dotted #9A9EA4; z-index:0}
+  .stack::before{top:6px}
+  .stack::after{top:210px}
 
   .block{border:2.2px solid #000; background:#0E1116; padding:4px; position:relative;
-    z-index:1; flex:0 0 auto}
+    z-index:1}
   .block img{display:block; width:168px; height:168px; object-fit:cover}
-  .block.pair-item img{width:132px; height:132px}
+  .block.pair-item img{width:120px; height:120px}
   .plate-cap{font-family:var(--serif); font-weight:700; font-size:.72rem;
     text-align:center; margin-top:.3rem; line-height:1.2; color:#14161A}
 
-  /* thumbnails of the 2D panels this stage actually produced */
-  .thumbs{flex:0 0 92px; width:92px; display:flex; flex-direction:column; gap:.45rem;
-    position:relative; z-index:1}
+  /* the 2D panels this stage produced, in a row under its plate */
+  .thumbs{display:flex; flex-direction:row; justify-content:center; gap:.5rem;
+    margin-top:.5rem; position:relative; z-index:1}
   .thumb{margin:0; border:1.6px solid #000; background:#fff; padding:2px}
   .thumb img{display:block; width:84px; height:84px; object-fit:cover}
   .thumb figcaption{font-family:var(--sans); font-size:.58rem; color:#4A4F56;
     text-align:center; margin:2px 0 0; padding:0; border:0; max-width:none;
     line-height:1.2; word-break:normal}
 
-  /* the legend column, one card per level */
-  .legend{flex:1 1 auto; max-width:430px}
-  .bar{display:flex; align-items:baseline; gap:.6rem; padding:.3rem .8rem;
-    color:#fff}
-  .bar .no{font-family:var(--sans); font-weight:700; font-size:1.7rem; line-height:1.2}
-  .bar .ttl{font-family:var(--mono); font-size:.68rem; letter-spacing:.16em;
+  /* the legend, under the stage it describes */
+  .legend{margin-top:1rem}
+  .bar{display:flex; align-items:baseline; gap:.5rem; padding:.28rem .7rem; color:#fff}
+  .bar .no{font-family:var(--sans); font-weight:700; font-size:1.55rem; line-height:1.2}
+  .bar .ttl{font-family:var(--mono); font-size:.62rem; letter-spacing:.14em;
     text-transform:uppercase}
-  .items{list-style:none; margin:.5rem 0 0; padding:0}
-  .items li{display:flex; align-items:baseline; gap:.6rem; padding:.16rem 0 .16rem .8rem;
-    font-family:var(--mono); font-size:.68rem; letter-spacing:.06em;
+  .items{list-style:none; margin:.45rem 0 0; padding:0}
+  .items li{display:flex; align-items:baseline; gap:.5rem; padding:.2rem 0 .2rem .7rem;
+    font-family:var(--mono); font-size:.62rem; letter-spacing:.04em; line-height:1.35;
     text-transform:uppercase; color:#2A2E33}
   .items li span{flex:1 1 auto}
   .items li i{flex:0 0 auto; width:7px; height:7px; border-radius:50%; display:block;
-    transform:translateY(-2px)}
+    transform:translateY(-1px)}
   .items li em{font-style:normal; text-transform:none; letter-spacing:0;
-    font-size:.66rem; color:#6A6E73}
+    font-size:.62rem; color:#6A6E73}
   .items li .path{text-transform:none; letter-spacing:0; color:#3E434A}
 
   /* the sweep arrows sit in the plate column, between levels */
@@ -335,33 +338,34 @@ def _thumb(b64: str, cap: str) -> str:
             f'alt="{cap}"><figcaption>{cap}</figcaption></figure>')
 
 
-def _sweep(bulge: str = "right", w: int = 430, h: int = 62) -> str:
-    """A hand-drawn style sweep arrow between two levels of the stack.
+def _sweep(bulge: str = "up", w: int = 66, h: int = 96) -> str:
+    """A hand-drawn style sweep arrow between two stages of the stack.
 
     A single cubic curve with a small open V head, the way an architectural
-    massing diagram carries you from one stage to the next. The head is computed
-    from the curve's own end tangent rather than guessed, so the V always sits on
-    the direction of travel; alternating the bulge keeps four of them from
-    reading as a printed repeat.
+    massing diagram carries you from one stage to the next. Landscape, so it
+    travels left to right; the head is computed from the curve's own end tangent
+    rather than hand-placed, and the bulge alternates so four of them do not read
+    as a printed repeat.
     """
     import math
 
-    x0, y0 = (118, 4)
-    x3, y3 = (150, h - 8)
-    if bulge == "right":
-        x1, y1, x2, y2 = 236, 10, 232, h - 22
-    else:
-        x1, y1 = 40, 12
-        x2, y2 = 44, h - 22
-        x0, x3 = 150, 120
+    # Both variants leave and arrive travelling rightward: the bulge alternates
+    # above and below the line, but the last control point stays close in y to
+    # the tip, so the head never ends up pointing back up the page.
+    y_mid = h / 2
+    d = 28 if bulge == "up" else -28
+    x0, y0 = 6, y_mid + d / 7
+    x1, y1 = 22, y_mid - d
+    x2, y2 = w - 30, y_mid - d / 5
+    x3, y3 = w - 10, y_mid + d / 14
 
     # end tangent of a cubic is 3 * (P3 - P2)
     tx, ty = x3 - x2, y3 - y2
     n = math.hypot(tx, ty) or 1.0
     tx, ty = tx / n, ty / n
-    head = 11.0
+    head = 10.0
     barbs = []
-    for deg in (26, -26):
+    for deg in (28, -28):
         a = math.radians(deg)
         # rotate the reversed tangent, so both barbs open behind the tip
         bx = (-tx) * math.cos(a) - (-ty) * math.sin(a)
@@ -371,12 +375,13 @@ def _sweep(bulge: str = "right", w: int = 430, h: int = 62) -> str:
     return (f'<svg class="sweep" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
             f'aria-hidden="true"><g fill="none" stroke="#14161A" stroke-width="1.5" '
             f'stroke-linecap="round">'
-            f'<path d="M{x0},{y0} C{x1},{y1} {x2},{y2} {x3:.0f},{y3:.0f}"/>'
+            f'<path d="M{x0},{y0:.1f} C{x1},{y1:.1f} {x2},{y2:.1f} {x3},{y3:.1f}"/>'
             f'<path d="{" ".join(barbs)}"/></g></svg>')
 
 
-def _level(no: int, title: str, hue: str, plate: str, items: list[tuple[str, str, str]]) -> str:
-    """One level of the stack: plate on the left, numbered legend on the right.
+def _level(no: int, title: str, hue: str, blocks: str, thumbs: str,
+           items: list[tuple[str, str, str]]) -> str:
+    """One stage of the stack: plate, then its 2D panels, then a numbered legend.
 
     ``items`` are (label, note, dot hue). The dot hue is the model or field the
     line refers to, so the legend, the 2D panels and the 3D renders all label the
@@ -391,7 +396,8 @@ def _level(no: int, title: str, hue: str, plate: str, items: list[tuple[str, str
         f'<i style="background:{dot}"></i></li>'
         for label, note, dot in items)
     return f"""<div class="level">
-      <div class="plate">{plate}</div>
+      <div class="plate">{blocks}</div>
+      <div class="thumbs">{thumbs}</div>
       <div class="legend">
         <div class="bar" style="background:{hue}">
           <span class="no">{no}</span><span class="ttl">{title}</span></div>
@@ -413,13 +419,12 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
     def render(name: str) -> str:
         return _b64_file(name) if os.path.exists(name) else ""
 
-    # Level 3 is the top of the stack and the start of the pipeline, so the
-    # numbering descends the way floors do in the reference figure.
-    lv3 = _level(
-        3, "Input and degradation", C_TRUE,
-        (_block(render("brain3d_true.png"), "The scan we start from")
-         + f'<div class="thumbs">{_thumb(p["hr"], "true scan")}'
-           f'{_thumb(p["lr"], "degraded")}</div>'),
+    # Landscape, so the stages read left to right and the numbering counts up
+    # with the flow rather than down a stack of floors.
+    lv1 = _level(
+        1, "Input and degradation", C_TRUE,
+        _block(render("brain3d_true.png"), "The scan we start from"),
+        _thumb(p["hr"], "true scan") + _thumb(p["lr"], "degraded"),
         [("Real BraTS, held-out patient", "no model has seen it", C_TRUE),
          (f"k-space truncation &times;{meta['factor']}", "resolution loss", GREY),
          ("Rician noise", f"&sigma;={meta['sigma']}, the noise magnitude MRI follows", GREY),
@@ -429,39 +434,35 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
     lv2 = _level(
         2, "Reconstruction", C_BASE,
         (_block(render("brain3d_distortion.png"), "Distortion-optimal", small=True)
-         + _block(render("brain3d_tumor_aware.png"), "Tumor-aware", small=True)
-         + f'<div class="thumbs">{_thumb(p["sr_d"], "baseline")}'
-           f'{_thumb(p["sr_t"], "ours")}</div>'),
+         + _block(render("brain3d_tumor_aware.png"), "Tumor-aware", small=True)),
+        _thumb(p["sr_d"], "baseline") + _thumb(p["sr_t"], "ours"),
         [("Two SR U-Nets", "identical architecture, data, schedule", GREY),
          ("Distortion-optimal", "pixel error only", C_BASE),
          ("Tumor-aware", "lesion-weighted, ours", C_OURS),
          ("No GAN, no pretrained weights", "realism rewards invention", GREY),
          ("src/models.py, src/losses.py", "", GREY)])
 
-    lv1 = _level(
-        1, "Detection and safety", C_OURS,
-        (_block(_overlay_frame() or render("brain3d_true.png"),
-                "All three, overlaid")
-         + f'<div class="thumbs">{_thumb(p["seg_d"], "on baseline")}'
-           f'{_thumb(p["seg_t"], "on ours")}</div>'),
+    lv3 = _level(
+        3, "Detection and safety", C_OURS,
+        _block(_overlay_frame() or render("brain3d_true.png"), "All three, overlaid"),
+        _thumb(p["seg_d"], "on baseline") + _thumb(p["seg_t"], "on ours"),
         [("One frozen segmenter", "reads every image", GREY),
          ("Only the image changes", "so the difference is the reconstruction", GREY),
          ("Fill = found, outline = true tumor", "a bare outline is an erasure", C_TRUE),
          ("Lesions erased, lesions fabricated", "by lesion size", C_BASE),
          ("src/metrics.py", "", GREY)])
 
-    lv0 = _level(
-        0, "Uncertainty", C_UNC,
-        (_block(render("brain3d_uncertainty.png"), "Where the model is unsure")
-         + f'<div class="thumbs">{_thumb(p["unc"], "uncertainty")}'
-           f'{_thumb(p["err"], "abs error")}</div>'),
+    lv4 = _level(
+        4, "Uncertainty", C_UNC,
+        _block(render("brain3d_uncertainty.png"), "Where the model is unsure"),
+        _thumb(p["unc"], "uncertainty") + _thumb(p["err"], "abs error"),
         [("Monte Carlo dropout", "10 stochastic passes", C_UNC),
          ("Variance across passes", "the model's own doubt", C_UNC),
          ("Is the doubt where the error is?", "uncertainty vs error AUROC", GREY),
          ("Restacked per-slice masks", "marching cubes", GREY),
          ("src/uncertainty.py, render_3d.py", "", GREY)])
 
-    sw_a, sw_b, sw_c = (_sweep("right"), _sweep("left"), _sweep("right"))
+    sw_a, sw_b, sw_c = (_sweep("up"), _sweep("down"), _sweep("up"))
 
     order = ["low-res", "distortion", "tumor-aware"]
     label = {"low-res": "low-res input", "distortion": "distortion-optimal (baseline)",
@@ -499,17 +500,17 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
 
   <h2>The pipeline</h2>
   <div class="figure"><div class="fig-inner">
-    <div class="stack">{lv3}{sw_a}{lv2}{sw_b}{lv1}{sw_c}{lv0}</div>
+    <div class="stack">{lv1}{sw_a}{lv2}{sw_b}{lv3}{sw_c}{lv4}</div>
     <figcaption><b>Figure 1.</b> The tumor-aware super-resolution pipeline, drawn
-    as an exploded stack: one patient, pulled apart into the four stages that act
-    on them. Every plate is a 3D volume this pipeline produced, and the small
+    as an exploded stack: one patient, pulled apart left to right into the four
+    stages that act on them. Every plate is a 3D volume this pipeline produced, and the small
     panels beside each plate are the 2D output of that same stage on one held-out
     slice. The sweeping arrows carry the direction of travel; the dotted verticals
     are alignment guides rather than flow, because the levels are one brain pulled
     apart, not four different ones. The degradation is applied on the
     fly, so every low-resolution input keeps an exact high-resolution reference and
-    no paired low-field acquisition is required. The segmentation network at level 1
-    is frozen and shared, which is what makes the two reconstructions at level 2
+    no paired low-field acquisition is required. The segmentation network at stage 3
+    is frozen and shared, which is what makes the two reconstructions at stage 2
     comparable: the only thing that changes is the image handed to it.</figcaption>
   </div></div>
   {note}
