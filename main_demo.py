@@ -227,36 +227,35 @@ def _floor_chart() -> str:
     base = [res["distortion"]["safety"]["erasure_rate_by_size"][k] * 100 for k in sizes]
     ours = [res["tumor-aware"]["safety"]["erasure_rate_by_size"][k] * 100 for k in sizes]
 
+    # Three bars per size, side by side, not stacked: the floor, then what each
+    # objective adds on top of it. The adds are the numbers that are ours to own.
     x = np.arange(3)
     w = 0.26
-    fig, ax = plt.subplots(figsize=(6.4, 3.5), facecolor="white")
-    ax.bar(x - w, fl, w, color="#9BA1A6", label="missed on the untouched scan")
-    ax.bar(x, [b - f for b, f in zip(base, fl)], w, bottom=fl,
-           color=LIGHT["distortion"], label="added by standard SR")
-    ax.bar(x, fl, w, color="#9BA1A6", alpha=0.35)
-    ax.bar(x + w, [o - f for o, f in zip(ours, fl)], w, bottom=fl,
-           color=LIGHT["tumor_aware"], label="added by ours")
-    ax.bar(x + w, fl, w, color="#9BA1A6", alpha=0.35)
+    add_b = [b - f for b, f in zip(base, fl)]
+    add_o = [o - f for o, f in zip(ours, fl)]
 
-    for i in range(3):
-        ax.text(x[i], base[i] + 1.6, f"+{base[i] - fl[i]:.1f}", ha="center",
-                fontsize=8.5, color=LIGHT["distortion"], fontweight="semibold")
-        ax.text(x[i] + w, ours[i] + 1.6, f"+{ours[i] - fl[i]:.1f}", ha="center",
-                fontsize=8.5, color=LIGHT["tumor_aware"], fontweight="semibold")
-        ax.text(x[i] - w, fl[i] + 1.6, f"{fl[i]:.1f}", ha="center", fontsize=8.5,
-                color="#6A6E73")
+    fig, ax = plt.subplots(figsize=(6.4, 3.4), facecolor="white")
+    ax.bar(x - w, fl, w, color="#8A9096", label="missed on the untouched scan")
+    ax.bar(x, add_b, w, color=LIGHT["distortion"], label="added by standard SR")
+    ax.bar(x + w, add_o, w, color=LIGHT["tumor_aware"], label="added by ours")
+
+    for xi, v, c in [(x - w, fl, "#5F666C"), (x, add_b, LIGHT["distortion"]),
+                     (x + w, add_o, LIGHT["tumor_aware"])]:
+        for k in range(3):
+            ax.text(xi[k], v[k] + 1.4, f"{v[k]:.1f}", ha="center", fontsize=8.5,
+                    color=c, fontweight="semibold")
 
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{l}\n{floor[k]['n']:,} lesions" for l, k in zip(labels, sizes)],
-                       fontsize=8.5, color="#444")
+    ax.set_xticklabels([f"{l}\n{floor[k]['n']:,} lesions"
+                        for l, k in zip(labels, sizes)], fontsize=9, color="#444")
     ax.set_ylabel("% of lesion components missed", fontsize=9, color="#444")
-    ax.set_ylim(0, 92)
+    ax.set_ylim(0, 78)
     ax.tick_params(axis="y", labelsize=8.5, colors="#6A6E73")
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color("#D9DAD8")
     ax.grid(axis="y", color="#E4E5E3", linewidth=0.8)
     ax.set_axisbelow(True)
-    ax.legend(fontsize=8, frameon=False, loc="upper right", handlelength=1.2)
+    ax.legend(fontsize=8.5, frameon=False, loc="upper right", handlelength=1.1)
     fig.tight_layout()
     import os
     os.makedirs("figures", exist_ok=True)
