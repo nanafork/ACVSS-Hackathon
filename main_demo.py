@@ -152,6 +152,117 @@ def _blindness_block() -> str:
 
 
 ARCH_PNG = "figures/architecture.png"
+MRI_PHOTO = "figures/mri_room.jpg"
+FLOOR = "results/segmenter_floor_by_size.json"
+
+
+def _val_results() -> dict:
+    """The validation run the result slides quote, or None if it is absent."""
+    import json
+    import os
+
+    if not os.path.exists(VAL_RUN):
+        return {}
+    return json.load(open(VAL_RUN))["results"]
+
+
+def _matched_stats() -> str:
+    """The three figures that say the quality really is matched.
+
+    Read from the run files rather than typed in, so a rerun cannot leave the
+    slide quoting the previous one.
+    """
+    import json
+    import os
+
+    res = _val_results()
+    if not res:
+        return ""
+    d_dice = res["distortion"]["dice"]
+    t_dice = res["tumor-aware"]["dice"]
+    gap = res["distortion"]["psnr_brain"] - res["tumor-aware"]["psnr_brain"]
+
+    removed = ""
+    if os.path.exists(FLOOR):
+        floor = json.load(open(FLOOR))
+        n = sum(v["n"] for v in floor.values())
+        fl = sum(v["erased_on_true_hr"] * v["n"] for v in floor.values()) / n
+        base = res["distortion"]["safety"]["false_negative_erasure_rate"]
+        ours = res["tumor-aware"]["safety"]["false_negative_erasure_rate"]
+        if base > fl:
+            removed = f"{(1 - (ours - fl) / (base - fl)) * 100:.0f}%"
+
+    cells = []
+    if removed:
+        cells.append(f'<div class="stat"><b style="color:var(--safe)">{removed}</b>'
+                     f'<span>of the erasure our own pipeline adds, removed</span></div>')
+    cells.append(f'<div class="stat"><b>{t_dice:.3f}</b>'
+                 f'<span>Dice, ours &middot; {d_dice:.3f} baseline</span></div>')
+    cells.append(f'<div class="stat"><b>{abs(gap):.2f}<span class="u"> dB</span></b>'
+                 f'<span>brain-masked PSNR gap</span></div>')
+    return f'<div class="statrow">{"".join(cells)}</div>'
+
+
+def _floor_chart() -> str:
+    """Erasure by lesion size as the floor plus what each model adds to it.
+
+    The absolute rate is mostly the segmenter's own floor on an untouched scan,
+    so the honest picture is a stack: what is missed before we touch anything,
+    then the excess each objective is responsible for.
+    """
+    import json
+    import os
+
+    res = _val_results()
+    if not res or not os.path.exists(FLOOR):
+        return ""
+    floor = json.load(open(FLOOR))
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    sizes = ["small", "medium", "large"]
+    labels = ["small\n<50 px", "medium\n50-200 px", "large\n>200 px"]
+    fl = [floor[k]["erased_on_true_hr"] * 100 for k in sizes]
+    base = [res["distortion"]["safety"]["erasure_rate_by_size"][k] * 100 for k in sizes]
+    ours = [res["tumor-aware"]["safety"]["erasure_rate_by_size"][k] * 100 for k in sizes]
+
+    x = np.arange(3)
+    w = 0.26
+    fig, ax = plt.subplots(figsize=(6.4, 3.5), facecolor="white")
+    ax.bar(x - w, fl, w, color="#9BA1A6", label="missed on the untouched scan")
+    ax.bar(x, [b - f for b, f in zip(base, fl)], w, bottom=fl,
+           color=LIGHT["distortion"], label="added by standard SR")
+    ax.bar(x, fl, w, color="#9BA1A6", alpha=0.35)
+    ax.bar(x + w, [o - f for o, f in zip(ours, fl)], w, bottom=fl,
+           color=LIGHT["tumor_aware"], label="added by ours")
+    ax.bar(x + w, fl, w, color="#9BA1A6", alpha=0.35)
+
+    for i in range(3):
+        ax.text(x[i], base[i] + 1.6, f"+{base[i] - fl[i]:.1f}", ha="center",
+                fontsize=8.5, color=LIGHT["distortion"], fontweight="semibold")
+        ax.text(x[i] + w, ours[i] + 1.6, f"+{ours[i] - fl[i]:.1f}", ha="center",
+                fontsize=8.5, color=LIGHT["tumor_aware"], fontweight="semibold")
+        ax.text(x[i] - w, fl[i] + 1.6, f"{fl[i]:.1f}", ha="center", fontsize=8.5,
+                color="#6A6E73")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{l}\n{floor[k]['n']:,} lesions" for l, k in zip(labels, sizes)],
+                       fontsize=8.5, color="#444")
+    ax.set_ylabel("% of lesion components missed", fontsize=9, color="#444")
+    ax.set_ylim(0, 92)
+    ax.tick_params(axis="y", labelsize=8.5, colors="#6A6E73")
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.spines[["left", "bottom"]].set_color("#D9DAD8")
+    ax.grid(axis="y", color="#E4E5E3", linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.legend(fontsize=8, frameon=False, loc="upper right", handlelength=1.2)
+    fig.tight_layout()
+    return (f'<figure class="chart"><img src="data:image/png;base64,{_fig_to_b64(fig)}" '
+            f'alt="erasure by lesion size: the segmenter\'s floor on the untouched scan, '
+            f'plus the excess each objective adds"></figure>')
 
 
 def _arch_block() -> str:
@@ -179,6 +290,19 @@ def _arch_block() -> str:
       <div class="step"><div class="n">04</div><h3>Score</h3>
         <p>PSNR and SSIM inside the brain, Dice, and lesions erased or fabricated.</p></div>
     </div>"""
+
+
+def _photo_block() -> str:
+    """The scanner photograph on the access slide, if it is present."""
+    import os
+
+    if not os.path.exists(MRI_PHOTO):
+        return ""
+    return (f'<figure class="photo"><img src="data:image/jpeg;base64,{_b64(MRI_PHOTO)}" '
+            f'alt="a 3 tesla MRI scanner in a shielded room">'
+            f'<figcaption>A three tesla scanner needs a shielded room, a cooling supply and '
+            f'power that does not fail. This is the machine that will not close the '
+            f'gap.</figcaption></figure>')
 
 
 def _byline() -> str:
@@ -217,9 +341,13 @@ PAGE = """<!doctype html>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{{
-    --ink:#1A1A1A; --ink-mid:#444; --ink-light:#6A6E73;
-    --bg:#DEDFDD; --card:#F1F1F0; --card-2:#E4E5E3; --border:#D9DAD8;
-    --navy:#16213E; --accent:#3B82F6; --accent-deep:#2A4A7F; --warn:#C0862B;
+    /* Chrome is deep green on off-white. The data hues below are untouched:
+       green already means tumor-aware in every figure and 3D render, so the brand
+       green is kept dark and desaturated and never placed beside a chart. */
+    --ink:#14201B; --ink-mid:#3D4A44; --ink-light:#6B7772;
+    --bg:#EFEFE9; --card:#F7F7F2; --card-2:#E7E7E0; --border:#DBDBD2;
+    --navy:#0B5340; --accent:#0B5340; --accent-deep:#083A2C; --lime:#D6EF4A;
+    --warn:#B8791F;
     /* the three tumor hues + the uncertainty ramp, from src/palette.py */
     --true:{c_true}; --erased:{c_di}; --safe:{c_ta}; --unc:{c_unc};
     --font:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -253,7 +381,7 @@ PAGE = """<!doctype html>
   .btn:hover:not(:disabled){{background:var(--navy); color:#fff; border-color:var(--navy)}}
   .btn:disabled{{opacity:.32; cursor:not-allowed}}
   .btn.primary{{background:var(--navy); color:#fff; border-color:var(--navy)}}
-  .btn.primary:hover{{background:#0e1730}}
+  .btn.primary:hover{{background:#072A20}}
   .dots{{display:flex; gap:.42rem; flex:1; flex-wrap:wrap}}
   .dot-nav{{width:.62rem; height:.62rem; border-radius:50%; border:none; padding:0;
     background:var(--border); cursor:pointer; transition:.15s}}
@@ -264,8 +392,16 @@ PAGE = """<!doctype html>
   .hint{{font-family:var(--mono); font-size:.66rem; color:var(--ink-light)}}
   @media(max-width:700px){{.hint{{display:none}}}}
 
-  .tag{{font-family:var(--mono); font-size:.7rem; letter-spacing:.24em; text-transform:uppercase;
-    color:var(--accent)}}
+  /* a header line with a hairline under it, the way a printed deck runs its meta */
+  /* absolute, not flex: the section label is a span plus a bare text node, and
+     flex would treat those as two items and push them apart */
+  .tag{{position:relative; font-family:var(--mono); font-size:.7rem; letter-spacing:.24em;
+    text-transform:uppercase; color:var(--accent); padding:0 13rem .55rem 0;
+    border-bottom:1px solid var(--border); margin-bottom:1rem}}
+  .tag::after{{content:"Tumor-aware SR · ACVSS"; position:absolute; right:0; top:0;
+    color:var(--ink-light); letter-spacing:.16em; white-space:nowrap}}
+  .tag.backup::after{{content:"Backup · for questions"}}
+  @media(max-width:820px){{.tag{{padding-right:0}} .tag::after{{content:none}}}}
   h1{{font-weight:700; font-size:clamp(2.1rem,5.6vw,3.7rem); line-height:1.03;
     letter-spacing:-.02em; margin:.5rem 0 .5rem; max-width:20ch}}
   h1 em{{font-style:normal; color:var(--accent-deep)}}
@@ -282,10 +418,11 @@ PAGE = """<!doctype html>
     justify-content:center; background:var(--navy); color:#fff; border-radius:20px;
     padding:clamp(2rem,5vw,4rem); position:relative; overflow:hidden}}
   .title-slide::after{{content:""; position:absolute; right:-8%; top:-35%; width:480px;
-    height:480px; background:radial-gradient(circle, rgba(59,130,246,.3), transparent 62%)}}
+    height:480px; background:radial-gradient(circle, rgba(214,239,74,.22), transparent 62%)}}
   .title-slide > *{{position:relative; z-index:2}}
-  .title-slide .tag{{color:#8fb4ff}}
-  .title-slide h1 em{{color:#7fa8ff}}
+  .title-slide .tag{{color:var(--lime); border:0; padding:0; margin-bottom:.4rem}}
+  .title-slide .tag::after{{content:none}}
+  .title-slide h1 em{{color:var(--lime)}}
   .title-slide .lede{{color:rgba(255,255,255,.74)}}
   .title-slide .lede b{{color:#fff}}
   .byline{{font-family:var(--mono); font-size:.76rem; color:rgba(255,255,255,.5);
@@ -378,11 +515,28 @@ PAGE = """<!doctype html>
   /* definition cards: an accent rail on the left, a term, then what it means */
   .terms{{display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:1.3rem}}
   .term{{background:var(--card); border:1px solid var(--border); border-radius:12px;
-    border-left:4px solid var(--accent); padding:1rem 1.15rem}}
+    border-left:4px solid var(--ink-light); padding:1rem 1.15rem}}
   .term h3{{font-size:1rem; margin:0 0 .4rem; letter-spacing:-.01em}}
   .term p{{font-size:.86rem; color:var(--ink-mid); margin:0}}
   .term p + p{{margin-top:.45rem}}
   .term code{{font-size:.8rem}}
+
+  /* a row of headline figures, the way a stat trio reads on a slide */
+  .statrow{{display:flex; gap:1.5rem; flex-wrap:wrap; margin:.1rem 0 .9rem}}
+  .stat > b{{display:block; font-family:var(--mono); font-weight:500; font-size:1.6rem;
+    line-height:1.1; color:var(--ink)}}
+  .stat span b{{font-family:var(--font); font-size:.8rem; font-weight:600; color:var(--ink)}}
+  .stat > b .u{{font-size:.9rem; color:var(--ink-light)}}
+  .chart{{margin:.2rem 0 0}}
+  .chart img{{display:block; width:100%; height:auto; border-radius:12px}}
+  .stat span{{display:block; font-size:.72rem; color:var(--ink-light); margin-top:.2rem;
+    max-width:26ch}}
+
+  /* a photograph, framed like the figures rather than floated in the page */
+  .photo{{margin:0; border:1px solid var(--border); border-radius:14px; overflow:hidden;
+    background:var(--card)}}
+  .photo img{{display:block; width:100%; height:auto}}
+  .photo figcaption{{font-size:.76rem; color:var(--ink-light); padding:.55rem .8rem .6rem}}
 
   /* evidence on the left, what to take from it on the right */
   .readout{{display:grid; grid-template-columns:1.5fr 1fr; gap:1.6rem; align-items:start;
@@ -416,9 +570,17 @@ PAGE = """<!doctype html>
   .role span{{display:block; font-size:.82rem; color:var(--ink-mid); margin-top:.25rem}}
   .role .todo{{color:var(--warn); font-weight:600}}
 
-  .scope{{background:var(--card); border:1px solid var(--border); border-radius:14px;
-    padding:1.2rem 1.4rem; margin-top:1.2rem}}
-  .scope li{{font-size:.88rem; color:var(--ink-mid); margin:.45rem 0}}
+  /* numbered rows on hairlines, so a list of limits reads as a register */
+  .scope{{margin-top:1rem}}
+  .scope ul{{counter-reset:sc; list-style:none; margin:0; padding:0}}
+  /* hanging indent rather than a grid: an li holds a <b> and a bare text node,
+     and a two-column grid would drop the text into a third cell */
+  .scope li{{counter-increment:sc; position:relative; border-top:1px solid var(--border);
+    padding:.72rem 0 .72rem 3.4rem; font-size:.88rem; color:var(--ink-mid)}}
+  .scope li:last-child{{border-bottom:1px solid var(--border)}}
+  .scope li::before{{content:"(" counter(sc, decimal-leading-zero) ")"; position:absolute;
+    left:0; top:.86rem; font-family:var(--mono); font-size:.7rem; color:var(--accent);
+    letter-spacing:.06em}}
   .scope li b{{color:var(--ink)}}
 
   .credits{{font-size:.84rem; color:var(--ink-light); margin-top:1.2rem; max-width:70ch}}
@@ -447,17 +609,21 @@ PAGE = """<!doctype html>
   <section class="slide">
     <div class="tag"><span class="sec">01</span>Why this matters</div>
     <h2>Cheap, low-quality scanners are the only realistic way to widen MRI access.</h2>
-    <div class="vitals">
-      <div class="vital"><div class="k">Ghana</div>
-        <div class="v" style="color:var(--erased)">14<span class="u">scanners</span></div>
-        <div class="d">for more than 30 million people, and two thirds of them sit in
-          Greater Accra</div></div>
-      <div class="vital"><div class="k">Sub-Saharan Africa</div>
-        <div class="v" style="color:var(--erased)">&lt;1<span class="u">per million</span></div>
-        <div class="d">MRI is scarce where the disease burden is not</div></div>
-      <div class="vital"><div class="k">High-income countries</div>
-        <div class="v" style="color:var(--ink-mid)">37<span class="u">per million</span></div>
-        <div class="d">up to this many, for the same imaging need</div></div>
+    <div class="readout">
+      <div class="ev">{photo}</div>
+      <div class="take">
+        <div class="statrow" style="flex-direction:column; gap:1.05rem">
+          <div class="stat"><b style="color:var(--erased)">14</b>
+            <span><b style="color:var(--ink)">Ghana.</b> For more than 30 million people, and
+            two thirds of them sit in Greater Accra.</span></div>
+          <div class="stat"><b style="color:var(--erased)">&lt;1</b>
+            <span><b style="color:var(--ink)">Per million, much of sub-Saharan Africa.</b>
+            MRI is scarce where the disease burden is not.</span></div>
+          <div class="stat"><b>37</b>
+            <span><b style="color:var(--ink)">Per million, high-income countries.</b> Up to
+            this many, for the same imaging need.</span></div>
+        </div>
+      </div>
     </div>
     <p class="note">A portable scanner runs at about <b>0.055&nbsp;tesla</b>, a fiftieth of a
     hospital magnet. A weaker magnet means a weaker signal, so the high frequencies in
@@ -542,7 +708,7 @@ PAGE = """<!doctype html>
       <div class="lscale"><div><span>0%</span>
         <span class="mid">of enhancing lesion components missed</span><span>70%</span></div></div>
       <div class="lkey">
-        <span>Same frozen tumor detector in all three rows. Only the image it is given changes,
+        <span>Same frozen segmenter in all three rows. Only the image it is given changes,
         so the difference is caused by the reconstruction and not by a different detector.</span>
       </div>
     </div>
@@ -550,8 +716,8 @@ PAGE = """<!doctype html>
     <div class="take" style="margin-top:1.1rem">
       <h3>Read the bottom bar against the middle one</h3>
       <p>Both reconstructions recover tumor the degradation destroyed. Ours recovers
-      <b>6.7 points more</b>, at matched image quality: brain-masked PSNR 24.51 against
-      24.28.</p>
+      <b>6.7 points more</b>, and the image quality is genuinely matched.</p>
+      {matched}
       <p>The cost is hallucination, 0.266 to 0.387.</p>
       <div class="pill"><b>Validation, not test.</b> The 94 test patients get one
       evaluation, once, and that is the number we will stand behind.</div>
@@ -563,33 +729,18 @@ PAGE = """<!doctype html>
     <h2>Large lesions are almost never lost. Small ones are the whole problem.</h2>
     <div class="readout">
       <div class="ev">
-      <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
-        border-radius:14px; padding:.4rem">
-        <tr>
-          <th>lesion size</th><th class=num>how many</th>
-          <th class=num>degraded scan<br><span style="font-weight:400;text-transform:none;letter-spacing:0">before reconstruction</span></th>
-          <th class=num>standard SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(baseline)</span></th>
-          <th class=num>tumor-aware SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(ours)</span></th>
-        </tr>
-        <tr><td><b>small</b> &lt;50&nbsp;px</td><td class=num>6,762 <span style="color:var(--ink-light)">(71%)</span></td>
-          <td class=num>82.1%</td><td class=num style="color:var(--erased)">78.6%</td>
-          <td class=num style="color:var(--safe)"><b>69.8%</b></td></tr>
-        <tr><td><b>medium</b> 50&ndash;200&nbsp;px</td><td class=num>1,005</td>
-          <td class=num>30.0%</td><td class=num style="color:var(--erased)">16.4%</td>
-          <td class=num style="color:var(--safe)"><b>13.5%</b></td></tr>
-        <tr><td><b>large</b> &gt;200&nbsp;px</td><td class=num>1,723</td>
-          <td class=num>3.2%</td><td class=num style="color:var(--erased)">1.2%</td>
-          <td class=num style="color:var(--safe)"><b>0.9%</b></td></tr>
-      </table>
-        <p class="note">Same 70 patients, 9,490 lesion components. Each column is the share
-        the segmenter could no longer find.</p>
+      {floor_chart}
+        <p class="note">Same 70 validation patients, 9,490 lesion components. Grey is what
+        the frozen segmenter misses on the <b>untouched</b> scan; the block on top of it is the
+        excess each objective is responsible for.</p>
       </div>
       <div class="take">
-        <h3>Read the large row first</h3>
+        <h3>Read the large group first</h3>
         <p>A lesion over 200&nbsp;px is missed about <b>1% of the time</b> by either model, so
         nothing here says half of all tumors vanish.</p>
-        <p>The rate is driven by the top row: <b>71% of components are under 50&nbsp;px</b>,
-        and that is where our objective earns its keep, 78.6 down to 69.8.</p>
+        <p>The rate is driven by the small group: <b>71% of all components are under
+        50&nbsp;px</b>, and that is where our objective earns its keep, 13.5 points of added
+        erasure down to 4.7.</p>
         <div class="pill">The same pipeline on whole tumor, a tenth of the image, does nothing
         at all. The loss only helps where the structure is small enough for a pixel score to
         ignore it.</div>
@@ -728,7 +879,7 @@ PAGE = """<!doctype html>
       <li><b>Validation, not test.</b> One evaluation on 94 untouched patients is still to
           come.</li>
     </ul></div>
-    <p class="note">The detector's own floor, our audit, the tradeoff dial and the per-slice
+    <p class="note">The segmenter's own floor, our audit, the tradeoff dial and the per-slice
     evidence are on the backup slides. Press <b>B</b>.</p>
   </section>
 
@@ -769,12 +920,14 @@ PAGE = """<!doctype html>
         <td class=num>0.5%</td><td class=num style="color:var(--erased)">+0.7</td>
         <td class=num style="color:var(--safe)"><b>+0.4</b></td></tr>
       <tr><td><b>overall</b></td><td class=num>9,490</td>
-        <td class=num><b>45.5%</b></td><td class=num style="color:var(--erased)">+9.1</td>
-        <td class=num style="color:var(--safe)"><b>+2.6</b></td></tr>
+        <td class=num><b>47.6%</b></td><td class=num style="color:var(--erased)">+10.4</td>
+        <td class=num style="color:var(--safe)"><b>+3.8</b></td></tr>
     </table>
     <p class="note"><b>Read the last two columns, not the first.</b> A raw rate near 50% is
     mostly this floor rather than damage done by super-resolution. The part attributable to the
-    pipeline is the excess, and our objective removes about <b>71% of it</b> overall. It also
+    pipeline is the excess, and our objective removes about <b>64% of it</b> overall. Every
+    rate in this table is pooled over lesions; per patient the floor is 45.5% rather than
+    47.6%, and mixing the two is how an earlier version of this slide reached 71%. It also
     means the honest priority is a stronger detector: it is the weakest link, not the
     enhancement. And it is why cm&sup3; must never be read off a render &mdash; the segmenter
     over-reads even a clean scan, so a reconstruction is only ever compared against the
@@ -1046,7 +1199,8 @@ def build(out: str = OUT, device: str | None = None, n_slices: int = 3):
         img_di=_b64(pngs["distortion"]), img_gif=_b64(gif),
         unc_panel=unc_panel, slices=slices,
         blindness=_blindness_block(), roles=_roles_block(), byline=_byline(),
-        arch=_arch_block(),
+        arch=_arch_block(), photo=_photo_block(),
+        matched=_matched_stats(), floor_chart=_floor_chart(),
         size=size, factor=factor, sigma=sigma,
     )
     with open(out, "w") as f:

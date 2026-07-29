@@ -119,6 +119,15 @@ removes about 71% of it overall and two thirds of it in the small bin that
 dominates the count. `evaluate_pipeline` now emits a `truehr` row and
 `erasure_above_floor` so no table can be quoted without its denominator.
 
+**Correction, 2026-07-29: the 71% above mixes two units.** The overall floor of
+45.5% is the *mean per patient* (`mean_per_patient_erasure_on_true_hr`), while the
+model rates it is subtracted from are *pooled over lesions*. Pooled throughout,
+the floor is 47.6%, standard SR adds 10.4 points and ours adds 3.8, so the share
+of our own damage removed is **64%**, not 71%. The per-size rows are unaffected:
+they were pooled on both sides already. The deck now computes this figure from
+`results/segmenter_floor_by_size.json` and `results/val/val_w40_sl0.0.json` at
+build time rather than carrying it by hand.
+
 ## Runs
 
 ### Run 1 — original quick checkpoint (superseded)
