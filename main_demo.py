@@ -359,42 +359,19 @@ PAGE = """<!doctype html>
     min-height:100vh}}
 
   /* ---- deck mechanics: one slide visible at a time ---- */
-  .deck{{max-width:1100px; margin:0 auto; padding:1.2rem clamp(1rem,4vw,2rem) 6.5rem;
+  .deck{{max-width:1100px; margin:0 auto; padding:1.4rem clamp(1rem,4vw,2rem) 2.4rem;
     min-height:100vh}}
+  /* the title fills the screen edge to edge, so the deck's own gutters are undone
+     for that one slide */
+  body.is-title .deck{{max-width:none; padding:0}}
   .slide{{display:none; animation:fade .34s cubic-bezier(.2,.7,.2,1)}}
   /* vertically centred, so a short slide does not leave a lake of space under it
      while a tall one still grows downward instead of being clipped */
   .slide.on{{display:flex; flex-direction:column; justify-content:center;
-    min-height:calc(100vh - 9rem)}}
+    min-height:calc(100vh - 3.8rem)}}
   @keyframes fade{{from{{opacity:0; transform:translateY(10px)}} to{{opacity:1; transform:none}}}}
   @media(prefers-reduced-motion:reduce){{.slide{{animation:none}}}}
 
-  /* ---- fixed bottom navigation bar ---- */
-  .navbar{{position:fixed; left:0; right:0; bottom:0; z-index:50;
-    background:rgba(241,241,240,.94); backdrop-filter:blur(10px);
-    border-top:1px solid var(--border)}}
-  .navbar .inner{{max-width:1100px; margin:0 auto; display:flex; align-items:center;
-    gap:1rem; padding:.7rem clamp(1rem,4vw,2rem)}}
-  .btn{{font-family:var(--font); font-size:.85rem; font-weight:600; cursor:pointer;
-    border:1px solid var(--border); background:var(--card); color:var(--ink);
-    padding:.5rem 1.1rem; border-radius:99px; transition:.15s}}
-  .btn:hover:not(:disabled){{background:var(--navy); color:#fff; border-color:var(--navy)}}
-  .btn:disabled{{opacity:.32; cursor:not-allowed}}
-  .btn.primary{{background:var(--navy); color:#fff; border-color:var(--navy)}}
-  .btn.primary:hover{{background:#072A20}}
-  .dots{{display:flex; gap:.42rem; flex:1; flex-wrap:wrap}}
-  .dot-nav{{width:.62rem; height:.62rem; border-radius:50%; border:none; padding:0;
-    background:var(--border); cursor:pointer; transition:.15s}}
-  .dot-nav:hover{{background:var(--ink-light)}}
-  .dot-nav.on{{background:var(--navy); transform:scale(1.28)}}
-  .counter{{font-family:var(--mono); font-size:.74rem; color:var(--ink-light);
-    min-width:4.2rem; text-align:right}}
-  .hint{{font-family:var(--mono); font-size:.66rem; color:var(--ink-light)}}
-  @media(max-width:700px){{.hint{{display:none}}}}
-
-  /* a header line with a hairline under it, the way a printed deck runs its meta */
-  /* absolute, not flex: the section label is a span plus a bare text node, and
-     flex would treat those as two items and push them apart */
   .tag{{position:relative; font-family:var(--mono); font-size:.7rem; letter-spacing:.24em;
     text-transform:uppercase; color:var(--accent); padding:0 13rem .55rem 0;
     border-bottom:1px solid var(--border); margin-bottom:1rem}}
@@ -414,9 +391,10 @@ PAGE = """<!doctype html>
   .note{{max-width:72ch; font-size:.85rem; color:var(--ink-light); margin:.9rem 0 0}}
 
   /* title slide */
-  .title-slide{{min-height:calc(100vh - 8rem); display:flex; flex-direction:column;
-    justify-content:center; background:var(--navy); color:#fff; border-radius:20px;
-    padding:clamp(2rem,5vw,4rem); position:relative; overflow:hidden}}
+  .title-slide{{min-height:100vh; display:flex; flex-direction:column;
+    justify-content:center; background:var(--navy); color:#fff; border-radius:0;
+    padding:clamp(2rem,7vw,6rem); position:relative; overflow:hidden}}
+  .title-slide h1{{max-width:24ch}}
   .title-slide::after{{content:""; position:absolute; right:-8%; top:-35%; width:480px;
     height:480px; background:radial-gradient(circle, rgba(214,239,74,.22), transparent 62%)}}
   .title-slide > *{{position:relative; z-index:2}}
@@ -525,6 +503,9 @@ PAGE = """<!doctype html>
   .statrow{{display:flex; gap:1.5rem; flex-wrap:wrap; margin:.1rem 0 .9rem}}
   .stat > b{{display:block; font-family:var(--mono); font-weight:500; font-size:1.6rem;
     line-height:1.1; color:var(--ink)}}
+  .statrow.big .stat > b{{font-size:clamp(2.6rem,5.5vw,3.8rem); letter-spacing:-.02em}}
+  .statrow.big .stat span{{font-size:.82rem; max-width:30ch}}
+  .statrow.big .stat span b{{font-size:.9rem}}
   .stat span b{{font-family:var(--font); font-size:.8rem; font-weight:600; color:var(--ink)}}
   .stat > b .u{{font-size:.9rem; color:var(--ink-light)}}
   .chart{{margin:.2rem 0 0}}
@@ -612,7 +593,7 @@ PAGE = """<!doctype html>
     <div class="readout">
       <div class="ev">{photo}</div>
       <div class="take">
-        <div class="statrow" style="flex-direction:column; gap:1.05rem">
+        <div class="statrow big" style="flex-direction:column; gap:1.3rem">
           <div class="stat"><b style="color:var(--erased)">14</b>
             <span><b style="color:var(--ink)">Ghana.</b> For more than 30 million people, and
             two thirds of them sit in Greater Accra.</span></div>
@@ -965,55 +946,22 @@ PAGE = """<!doctype html>
 
 </div>
 
-<nav class="navbar">
-  <div class="inner">
-    <button class="btn" id="prev" aria-label="previous slide">&larr; Prev</button>
-    <button class="btn primary" id="next" aria-label="next slide">Next &rarr;</button>
-    <button class="btn" id="mode" aria-label="show backup slides">Backup</button>
-    <div class="dots" id="dots"></div>
-    <span class="hint">&larr; &rarr; or space &middot; B for backup</span>
-    <span class="counter" id="counter"></span>
-  </div>
-</nav>
 
 <script>
 (function () {{
-  /* Two tracks. The talk is the ten slides without .extra, and the dots, the
-     counter and the arrow keys only ever move through those. The backups sit on
-     a second track reached with B or the Backup button, so material kept for
-     questions cannot lengthen the deck. */
+  /* No visible chrome: the deck is driven from the keyboard, and the backup track
+     is still there behind B for questions. */
   var main = Array.prototype.slice.call(document.querySelectorAll('.slide:not(.extra)'));
   var extra = Array.prototype.slice.call(document.querySelectorAll('.slide.extra'));
-  var dots = document.getElementById('dots');
-  var prev = document.getElementById('prev');
-  var next = document.getElementById('next');
-  var mode = document.getElementById('mode');
-  var counter = document.getElementById('counter');
   var backup = false;
-  var at = 0;      /* index in the talk */
-  var atx = 0;     /* index in the backups */
-
-  main.forEach(function (_, i) {{
-    var b = document.createElement('button');
-    b.className = 'dot-nav';
-    b.setAttribute('aria-label', 'go to slide ' + (i + 1));
-    b.addEventListener('click', function () {{ backup = false; go(i); }});
-    dots.appendChild(b);
-  }});
+  var at = 0, atx = 0;
 
   function paint() {{
     var list = backup ? extra : main;
     var i = backup ? atx : at;
     main.concat(extra).forEach(function (s) {{ s.classList.remove('on'); }});
     if (list[i]) list[i].classList.add('on');
-    Array.prototype.forEach.call(dots.children, function (d, j) {{
-      d.classList.toggle('on', !backup && j === at);
-    }});
-    prev.disabled = i === 0;
-    next.disabled = i === list.length - 1;
-    counter.textContent = (backup ? 'backup ' : '') + (i + 1) + ' / ' + list.length;
-    mode.classList.toggle('primary', backup);
-    mode.textContent = backup ? 'Back to talk' : 'Backup';
+    document.body.classList.toggle('is-title', !backup && i === 0);
     window.scrollTo({{ top: 0, behavior: 'instant' }});
     location.hash = (backup ? 'b' : 'p') + (i + 1);
   }}
@@ -1031,9 +979,6 @@ PAGE = """<!doctype html>
     paint();
   }}
 
-  prev.addEventListener('click', function () {{ go((backup ? atx : at) - 1); }});
-  next.addEventListener('click', function () {{ go((backup ? atx : at) + 1); }});
-  mode.addEventListener('click', toggle);
   document.addEventListener('keydown', function (e) {{
     if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {{ e.preventDefault(); go((backup ? atx : at) + 1); }}
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') {{ e.preventDefault(); go((backup ? atx : at) - 1); }}

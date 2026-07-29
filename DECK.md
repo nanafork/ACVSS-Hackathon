@@ -48,9 +48,10 @@ the cumulative column is where you should be as you leave the slide.
 
 ## The backups, and how to reach them
 
-Ten more slides sit off the running order: press **B** or click **Backup** in the
-nav bar, then **B** or Escape to come back where you left off. The dots and the
-counter only ever count the ten, so nothing here lengthens the talk.
+Ten more slides sit off the running order. The deck has no visible chrome now, so
+navigation is the keyboard: **arrows or space** move through the ten, **B** jumps to
+the backup track and **B** or Escape comes back where you left off. Nothing on that
+track can lengthen the talk, because it is not in the running order at all.
 
 | Backup | Use it when asked |
 |---|---|
