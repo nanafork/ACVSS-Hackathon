@@ -124,7 +124,7 @@ def _overlay_frame(path: str = "brain3d_rotate.gif", frame: int = 4) -> str:
 
 
 def _unet_diagram(model, hue: str, label: str, passes: int = 0,
-                  frozen: bool = False, inches=(2.75, 1.5), dpi=200) -> str:
+                  frozen: bool = False, inches=(3.05, 1.2), dpi=220) -> str:
     """The U-Net as it is actually built, drawn from the loaded module.
 
     Channel widths, depth, the residual connection, the dropout probability and
@@ -147,12 +147,13 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
     n_par = sum(q.numel() for q in model.parameters())
 
     # encoder down the left, bottleneck, decoder back up the right
-    nodes = [(0, 0, chans[0]), (1, -1, chans[1]), (2, -2, chans[2]),
-             (3, -3, chans[3]), (4, -2, chans[2]), (5, -1, chans[1]),
-             (6, 0, chans[0])]
+    dy = 0.74                     # flatter than one unit per level, so the
+    nodes = [(0, 0, chans[0]),    # drawing fits a short box without shrinking text
+             (1, -dy, chans[1]), (2, -2 * dy, chans[2]), (3, -3 * dy, chans[3]),
+             (4, -2 * dy, chans[2]), (5, -dy, chans[1]), (6, 0, chans[0])]
 
     fig, ax = plt.subplots(figsize=inches, facecolor="white")
-    bw, bh = 0.78, 0.52
+    bw, bh = 0.8, 0.44
     for x, y, c in nodes:
         ax.add_patch(FancyBboxPatch((x - bw / 2, y - bh / 2), bw, bh,
                                     boxstyle="round,pad=0.02,rounding_size=0.08",
@@ -162,7 +163,7 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
                                     boxstyle="round,pad=0.02,rounding_size=0.08",
                                     linewidth=0.8, edgecolor=hue,
                                     facecolor="none", zorder=3))
-        ax.text(x, y, str(c), ha="center", va="center", fontsize=5.4,
+        ax.text(x, y, str(c), ha="center", va="center", fontsize=6.6,
                 color="#14161A", zorder=4)
 
     def arrow(a, b, dashed=False):
@@ -179,12 +180,12 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
         arrow(nodes[i][:2], nodes[6 - i][:2], dashed=True)
 
     for depth in range(4):                    # what the grid is at each level
-        ax.text(-0.72, -depth, f"{128 >> depth}", ha="right", va="center",
-                fontsize=4.4, color="#8A8F96")
+        ax.text(-0.66, -depth * dy, f"{128 >> depth}", ha="right", va="center",
+                fontsize=5.2, color="#8A8F96")
 
     if passes:
-        ax.text(6, 0.62, f"$\\times${passes} passes $\\rightarrow\\ \\sigma$",
-                ha="center", va="bottom", fontsize=5.0, color=hue)
+        ax.text(6, 0.42, f"$\\times${passes} passes $\\rightarrow\\ \\sigma$",
+                ha="center", va="bottom", fontsize=6.0, color=hue)
 
     bits = [label, f"base {base}"]
     if getattr(model, "residual", False):
@@ -193,13 +194,13 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
     if frozen:
         bits.append("frozen")
     bits.append(f"{n_par / 1e6:.1f}M params")
-    ax.text(3, -3.95, " \u00b7 ".join(bits), ha="center", va="center",
-            fontsize=5.0, color="#3E434A")
-    ax.text(-0.72, 0.72, "skips dashed", ha="left", va="center", fontsize=4.4,
+    ax.text(3, -3 * dy - 0.62, " \u00b7 ".join(bits), ha="center", va="center",
+            fontsize=6.0, color="#3E434A")
+    ax.text(-0.66, 0.5, "skips dashed", ha="left", va="center", fontsize=5.2,
             color="#8A8F96")
 
-    ax.set_xlim(-1.15, 6.75)
-    ax.set_ylim(-4.25, 0.95)
+    ax.set_xlim(-1.1, 6.7)
+    ax.set_ylim(-3 * dy - 0.95, 0.78)
     ax.set_axis_off()
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.02, bbox_inches="tight",
@@ -209,7 +210,7 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
 
 
 def _kspace_diagram(img: np.ndarray, factor: int, sigma: float, hue: str,
-                    inches=(2.75, 1.5), dpi=200) -> str:
+                    inches=(3.05, 1.2), dpi=220) -> str:
     """The forward model, drawn from the actual slice: keep the centre of k-space.
 
     Both panels are this slice's own Fourier transform, so the process box is a
@@ -230,7 +231,7 @@ def _kspace_diagram(img: np.ndarray, factor: int, sigma: float, hue: str,
     fig, ax = plt.subplots(1, 2, figsize=inches, facecolor="white")
     for a, (im, ttl) in zip(ax, [(lg(k), "k-space"), (lg(k * mask), "truncated")]):
         a.imshow(im, cmap="gray", vmin=0, vmax=lg(k).max())
-        a.set_title(ttl, fontsize=5.2, color="#3E434A", pad=2.5)
+        a.set_title(ttl, fontsize=6.0, color="#3E434A", pad=2.5)
         a.set_xticks([]); a.set_yticks([])
         for sp in a.spines.values():
             sp.set_linewidth(0.6); sp.set_edgecolor("#8A8F96")
@@ -239,7 +240,7 @@ def _kspace_diagram(img: np.ndarray, factor: int, sigma: float, hue: str,
     fig.text(0.5, 0.015,
              f"keep the central 1/{factor} per axis, invert, add Rician "
              f"\u03c3={sigma:g}",
-             ha="center", fontsize=5.0, color="#3E434A")
+             ha="center", fontsize=6.0, color="#3E434A")
     fig.subplots_adjust(wspace=0.12, top=0.86, bottom=0.14)
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.02, bbox_inches="tight",
@@ -418,7 +419,7 @@ CSS = """
   /* the process box: what the stage does, drawn from the code that does it */
   /* fixed height, so the numbered tabs stay on one line across all four stages
      even though the four diagrams do not share an aspect ratio */
-  .procbox{margin-top:.6rem; height:156px; border:1.6px solid #000; background:#fff;
+  .procbox{margin-top:.6rem; height:118px; border:1.6px solid #000; background:#fff;
     padding:3px; position:relative; z-index:1; display:flex; align-items:center}
   .procbox img{display:block; width:100%; height:100%; object-fit:contain}
 
