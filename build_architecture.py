@@ -3,7 +3,8 @@
 Every picture on the page is real output from this repository. One held-out
 BraTS slice is pushed through the actual trained models, and each stage of the
 pipeline is saved as its own panel: the true scan, the simulated low-field scan,
-both reconstructions, what the frozen detector finds in each of them, the MC
+both reconstructions, what the frozen segmentation network finds in each of
+them, the MC
 dropout uncertainty and the error map. The 3D renders are the ones already in
 the repo root. Nothing here is an illustration or a stock diagram.
 
@@ -124,12 +125,14 @@ def _overlay_frame(path: str = "brain3d_rotate.gif", frame: int = 4) -> str:
 
 
 def _unet_diagram(model, hue: str, label: str, passes: int = 0,
-                  frozen: bool = False, inches=(3.05, 1.2), dpi=220) -> str:
-    """The U-Net as it is actually built, drawn from the loaded module.
+                  frozen: bool = False, inches=(1.55, 1.55), dpi=260) -> tuple[str, str]:
+    """The U-Net as it is actually built, drawn square and small.
 
     Channel widths, depth, the residual connection, the dropout probability and
     the parameter count are read off the model rather than typed in here, so the
-    drawing cannot claim an architecture the code does not have.
+    drawing cannot claim an architecture the code does not have. The numbers ride
+    in the HTML caption returned alongside the image: text stays crisp at any size,
+    which is what lets the diagram itself be this small.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -147,70 +150,60 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
             break
     n_par = sum(q.numel() for q in model.parameters())
 
-    # encoder down the left, bottleneck, decoder back up the right
-    dy = 0.74                     # flatter than one unit per level, so the
-    nodes = [(0, 0, chans[0]),    # drawing fits a short box without shrinking text
-             (1, -dy, chans[1]), (2, -2 * dy, chans[2]), (3, -3 * dy, chans[3]),
-             (4, -2 * dy, chans[2]), (5, -dy, chans[1]), (6, 0, chans[0])]
+    # Equal scales, so a square patch draws square. dy is set so the U spans as
+    # much vertically as it does horizontally and fills the square frame.
+    dx, dy = 1.0, 1.9
+    nodes = [(i * dx, -min(i, 6 - i) * dy) for i in range(7)]
 
     fig, ax = plt.subplots(figsize=inches, facecolor="white")
-    bw, bh = 0.62, 0.38          # square corners, tight around the label
-    for x, y, c in nodes:
-        ax.add_patch(Rectangle((x - bw / 2, y - bh / 2), bw, bh, linewidth=0.8,
-                               edgecolor=hue, facecolor=to_rgba(hue, 0.18),
-                               zorder=2))
-        ax.text(x, y, str(c), ha="center", va="center", fontsize=5.7,
-                color="#14161A", zorder=4)
+    side = 0.46
+    for x, y in nodes:
+        ax.add_patch(Rectangle((x - side / 2, y - side / 2), side, side,
+                               linewidth=0.7, edgecolor=hue,
+                               facecolor=to_rgba(hue, 0.30), zorder=2))
 
     def arrow(a, b, dashed=False):
-        (x0, y0), (x1, y1) = a, b
         ax.add_patch(FancyArrowPatch(
-            (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=4.5,
-            linewidth=0.7, color="#14161A" if not dashed else "#8A8F96",
-            linestyle=(0, (2.4, 1.8)) if dashed else "solid",
-            shrinkA=5.5, shrinkB=5.5, zorder=1))
+            a, b, arrowstyle="-|>", mutation_scale=4.0, linewidth=0.7,
+            color="#8A8F96" if dashed else "#14161A",
+            linestyle=(0, (2.2, 1.6)) if dashed else "solid",
+            shrinkA=5.0, shrinkB=5.0, zorder=1))
 
-    for i in range(len(nodes) - 1):
-        arrow(nodes[i][:2], nodes[i + 1][:2])
+    for i in range(6):
+        arrow(nodes[i], nodes[i + 1])
     for i in (0, 1, 2):                       # the skips that make it a U
-        arrow(nodes[i][:2], nodes[6 - i][:2], dashed=True)
-
-    for depth in range(4):                    # what the grid is at each level
-        ax.text(-0.66, -depth * dy, f"{128 >> depth}", ha="right", va="center",
-                fontsize=5.2, color="#8A8F96")
+        arrow(nodes[i], nodes[6 - i], dashed=True)
 
     if passes:
-        ax.text(6, 0.42, f"$\\times${passes} passes $\\rightarrow\\ \\sigma$",
-                ha="center", va="bottom", fontsize=6.0, color=hue)
+        ax.text(6.0, 0.42, f"$\\times${passes}", ha="center", va="bottom",
+                fontsize=7.0, color=hue)
 
-    bits = [label, f"base {base}"]
+    ax.set_xlim(-0.55, 6.55)
+    ax.set_ylim(-3 * dy - 0.6, 0.8)
+    ax.set_aspect("equal")
+    ax.set_axis_off()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.01, bbox_inches="tight",
+                facecolor="white")
+    plt.close(fig)
+
+    bits = [label, " &rarr; ".join(str(c) for c in chans)]
     if getattr(model, "residual", False):
         bits.append("residual")
     bits.append(f"dropout {drop:g}" if drop else "no dropout")
     if frozen:
         bits.append("frozen")
     bits.append(f"{n_par / 1e6:.1f}M params")
-    ax.text(3, -3 * dy - 0.62, " \u00b7 ".join(bits), ha="center", va="center",
-            fontsize=6.0, color="#3E434A")
-    ax.text(-0.66, 0.5, "skips dashed", ha="left", va="center", fontsize=5.2,
-            color="#8A8F96")
-
-    ax.set_xlim(-1.1, 6.7)
-    ax.set_ylim(-3 * dy - 0.95, 0.78)
-    ax.set_axis_off()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.02, bbox_inches="tight",
-                facecolor="white")
-    plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode()
+    return base64.b64encode(buf.getvalue()).decode(), " &middot; ".join(bits)
 
 
 def _kspace_diagram(img: np.ndarray, factor: int, sigma: float, hue: str,
-                    inches=(3.05, 1.2), dpi=220) -> str:
-    """The forward model, drawn from the actual slice: keep the centre of k-space.
+                    inches=(1.55, 1.55), dpi=260) -> tuple[str, str]:
+    """The forward model, measured on this slice: keep the centre of k-space.
 
-    Both panels are this slice's own Fourier transform, so the process box is a
-    measurement of the degradation rather than a picture of one.
+    The panel is this slice's own Fourier transform with the retained block
+    outlined, so the process box is a measurement of the degradation rather than
+    a picture of one.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -220,29 +213,21 @@ def _kspace_diagram(img: np.ndarray, factor: int, sigma: float, hue: str,
     k = np.fft.fftshift(np.fft.fft2(img))
     h, w = k.shape
     kh, kw = max(1, h // (2 * factor)), max(1, w // (2 * factor))
-    mask = np.zeros_like(k, dtype=float)
-    mask[h // 2 - kh:h // 2 + kh, w // 2 - kw:w // 2 + kw] = 1.0
-    lg = lambda a: np.log1p(np.abs(a))
 
-    fig, ax = plt.subplots(1, 2, figsize=inches, facecolor="white")
-    for a, (im, ttl) in zip(ax, [(lg(k), "k-space"), (lg(k * mask), "truncated")]):
-        a.imshow(im, cmap="gray", vmin=0, vmax=lg(k).max())
-        a.set_title(ttl, fontsize=6.0, color="#3E434A", pad=2.5)
-        a.set_xticks([]); a.set_yticks([])
-        for sp in a.spines.values():
-            sp.set_linewidth(0.6); sp.set_edgecolor("#8A8F96")
-    ax[0].add_patch(Rectangle((w // 2 - kw, h // 2 - kh), 2 * kw, 2 * kh,
-                              fill=False, edgecolor=hue, linewidth=0.9))
-    fig.text(0.5, 0.015,
-             f"keep the central 1/{factor} per axis, invert, add Rician "
-             f"\u03c3={sigma:g}",
-             ha="center", fontsize=6.0, color="#3E434A")
-    fig.subplots_adjust(wspace=0.12, top=0.86, bottom=0.14)
+    fig, ax = plt.subplots(figsize=inches, facecolor="white")
+    ax.imshow(np.log1p(np.abs(k)), cmap="gray")
+    ax.add_patch(Rectangle((w // 2 - kw, h // 2 - kh), 2 * kw, 2 * kh,
+                           fill=False, edgecolor=hue, linewidth=1.1))
+    ax.set_xticks([]); ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_linewidth(0.6); sp.set_edgecolor("#8A8F96")
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.02, bbox_inches="tight",
+    fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.01, bbox_inches="tight",
                 facecolor="white")
     plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode()
+    cap = (f"k-space of this slice &middot; keep the central 1/{factor} per axis "
+           f"&middot; invert &middot; Rician &sigma;={sigma:g}")
+    return base64.b64encode(buf.getvalue()).decode(), cap
 
 
 def _mask_overlay(pred: np.ndarray, hue: str) -> np.ndarray:
@@ -413,11 +398,15 @@ CSS = """
     line-height:1.2; word-break:normal}
 
   /* the process box: what the stage does, drawn from the code that does it */
-  /* fixed height, so the numbered tabs stay on one line across all four stages
-     even though the four diagrams do not share an aspect ratio */
-  .procbox{margin-top:.6rem; height:118px; border:1.6px solid #000; background:#fff;
-    padding:3px; position:relative; z-index:1; display:flex; align-items:center}
+  /* the process box is a small square, centred under its plate; the wrapper has
+     a fixed height so the numbered tabs stay on one line across all four stages */
+  .procwrap{margin-top:.6rem; height:158px; position:relative; z-index:1}
+  .procbox{width:112px; height:112px; margin:0 auto; border:1.6px solid #000;
+    background:#fff; padding:3px; display:flex; align-items:center}
   .procbox img{display:block; width:100%; height:100%; object-fit:contain}
+  .proccap{margin:.3rem 0 0; font-size:.56rem; line-height:1.3; text-align:center;
+    color:#4A4F56}
+  .proccap b{color:#14161A}
 
   /* the 2D panels, moved out of the diagram into their own strip */
   .card{background:#fff; border:1px solid var(--rule); border-radius:6px;
@@ -503,7 +492,8 @@ def _barbs(x: float, y: float, tx: float, ty: float, head: float = 10.0,
 def _merge(w: int = 100, h: int = 96) -> str:
     """Two branches converging into one arrow, for the stage that pools inputs.
 
-    Both reconstructions are handed to the same frozen detector, so the arrow
+    Both reconstructions are handed to the same frozen segmentation network, so
+    the arrow
     between those stages is a merge rather than a single sweep: two bends come in
     from above and below and join a short trunk that carries the one head. Same
     stroke and same open V as ``_sweep``, so the figure reads as one hand.
@@ -548,9 +538,17 @@ def _sweep(bulge: str = "up", w: int = 66, h: int = 96) -> str:
             f'<path d="{_barbs(x3, y3, x3 - x2, y3 - y2)}"/></g></svg>')
 
 
-def _proc(b64: str) -> str:
-    """The process box under a plate: what this stage does, not what it output."""
-    return f'<div class="procbox"><img src="data:image/png;base64,{b64}" alt=""></div>'
+def _proc(diagram: tuple[str, str]) -> str:
+    """The process box under a plate: what this stage does, not what it output.
+
+    Takes the (image, caption) pair the diagram builders return. The caption is
+    HTML rather than baked into the PNG, so it stays sharp while the drawing above
+    it can be small.
+    """
+    b64, cap = diagram
+    return (f'<div class="procwrap"><div class="procbox">'
+            f'<img src="data:image/png;base64,{b64}" alt=""></div>'
+            f'<p class="proccap">{cap}</p></div>')
 
 
 def _level(no: int, title: str, hue: str, blocks: str, proc: str,
@@ -611,10 +609,10 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
          ("Lesion-weighted, ours", "", C_OURS)])
 
     lv3 = _level(
-        3, "Detection and safety", C_OURS,
+        3, "Segmentation and safety", C_OURS,
         _block(_overlay_frame() or render("brain3d_true.png"), "All three, overlaid"),
         _proc(procs["seg"]),
-        [("One frozen detector", "", GREY),
+        [("One frozen segmentation U-Net", "", GREY),
          ("Erased or fabricated", "", C_BASE)])
 
     lv4 = _level(
@@ -641,8 +639,8 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
 
     strip = "".join(_thumb(p[k], cap) for k, cap in [
         ("hr", "true scan"), ("lr", "degraded"), ("sr_d", "baseline"),
-        ("sr_t", "ours"), ("seg_d", "detector on baseline"),
-        ("seg_t", "detector on ours"), ("unc", "uncertainty"),
+        ("sr_t", "ours"), ("seg_d", "segmentation, baseline"),
+        ("seg_t", "segmentation, ours"), ("unc", "uncertainty"),
         ("err", "abs error")])
 
     entries = "".join(f'<div class="entry"><b>{path}</b><p>{what}</p></div>'
@@ -676,14 +674,16 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
     off the modules rather than sketched. The dotted horizontals are alignment
     guides, not flow. The two arrows merging into
     stage 3 are the point of the study: both reconstructions are read by the same
-    frozen detector, so the only thing that changes between them is the image
+    frozen segmentation network, so the only thing that changes between them is
+    the image
     handed to it.</figcaption>
   </div></div>
   {note}
 
   <h2>The same slice, stage by stage</h2>
   <p class="small">The 2D output of each stage on the held-out slice the figure
-  above was built from. Fill is what the frozen detector found, in that model's
+  above was built from. Fill is what the frozen segmentation network found, in
+  that model's
   colour; the blue outline is the true tumor, so an outline with nothing in it is
   an erased lesion.</p>
   <div class="card"><div class="strip">{strip}</div></div>
@@ -691,11 +691,12 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
   <h2>What that slice scored</h2>
   <p class="small">The same numbers the deck reports, for the single slice drawn
   above. It carries {meta['lesions']} lesion components. PSNR and SSIM compare the
-  image to the true scan; Dice, erased and fabricated compare the frozen detector's
+  image to the true scan; Dice, erased and fabricated compare the segmentation
+  network's
   output on it to the true tumor mask. One slice is an illustration, not a result:
   the aggregate figures come from 70 held-out patients.</p>
   <div class="scroll"><table>
-    <tr><th>image handed to the detector</th><th class=n>PSNR</th><th class=n>SSIM</th>
+    <tr><th>image handed to the segmenter</th><th class=n>PSNR</th><th class=n>SSIM</th>
       <th class=n>Dice</th><th class=n>erased</th><th class=n>fabricated</th></tr>
     {slice_rows}
   </table></div>
