@@ -123,6 +123,131 @@ def _overlay_frame(path: str = "brain3d_rotate.gif", frame: int = 4) -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
+def _unet_diagram(model, hue: str, label: str, passes: int = 0,
+                  frozen: bool = False, inches=(2.75, 1.5), dpi=200) -> str:
+    """The U-Net as it is actually built, drawn from the loaded module.
+
+    Channel widths, depth, the residual connection, the dropout probability and
+    the parameter count are read off the model rather than typed in here, so the
+    drawing cannot claim an architecture the code does not have.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import torch.nn as nn
+    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+
+    base = model.d1.block[0].out_channels
+    chans = [base, base * 2, base * 4, base * 8]
+    drop = 0.0
+    for m in model.modules():
+        if isinstance(m, (nn.Dropout, nn.Dropout2d)):
+            drop = float(m.p)
+            break
+    n_par = sum(q.numel() for q in model.parameters())
+
+    # encoder down the left, bottleneck, decoder back up the right
+    nodes = [(0, 0, chans[0]), (1, -1, chans[1]), (2, -2, chans[2]),
+             (3, -3, chans[3]), (4, -2, chans[2]), (5, -1, chans[1]),
+             (6, 0, chans[0])]
+
+    fig, ax = plt.subplots(figsize=inches, facecolor="white")
+    bw, bh = 0.78, 0.52
+    for x, y, c in nodes:
+        ax.add_patch(FancyBboxPatch((x - bw / 2, y - bh / 2), bw, bh,
+                                    boxstyle="round,pad=0.02,rounding_size=0.08",
+                                    linewidth=0.8, edgecolor=hue,
+                                    facecolor=hue, alpha=0.20, zorder=2))
+        ax.add_patch(FancyBboxPatch((x - bw / 2, y - bh / 2), bw, bh,
+                                    boxstyle="round,pad=0.02,rounding_size=0.08",
+                                    linewidth=0.8, edgecolor=hue,
+                                    facecolor="none", zorder=3))
+        ax.text(x, y, str(c), ha="center", va="center", fontsize=5.4,
+                color="#14161A", zorder=4)
+
+    def arrow(a, b, dashed=False):
+        (x0, y0), (x1, y1) = a, b
+        ax.add_patch(FancyArrowPatch(
+            (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=4.5,
+            linewidth=0.7, color="#14161A" if not dashed else "#8A8F96",
+            linestyle=(0, (2.4, 1.8)) if dashed else "solid",
+            shrinkA=7, shrinkB=7, zorder=1))
+
+    for i in range(len(nodes) - 1):
+        arrow(nodes[i][:2], nodes[i + 1][:2])
+    for i in (0, 1, 2):                       # the skips that make it a U
+        arrow(nodes[i][:2], nodes[6 - i][:2], dashed=True)
+
+    for depth in range(4):                    # what the grid is at each level
+        ax.text(-0.72, -depth, f"{128 >> depth}", ha="right", va="center",
+                fontsize=4.4, color="#8A8F96")
+
+    if passes:
+        ax.text(6, 0.62, f"$\\times${passes} passes $\\rightarrow\\ \\sigma$",
+                ha="center", va="bottom", fontsize=5.0, color=hue)
+
+    bits = [label, f"base {base}"]
+    if getattr(model, "residual", False):
+        bits.append("residual")
+    bits.append(f"dropout {drop:g}" if drop else "no dropout")
+    if frozen:
+        bits.append("frozen")
+    bits.append(f"{n_par / 1e6:.1f}M params")
+    ax.text(3, -3.95, " \u00b7 ".join(bits), ha="center", va="center",
+            fontsize=5.0, color="#3E434A")
+    ax.text(-0.72, 0.72, "skips dashed", ha="left", va="center", fontsize=4.4,
+            color="#8A8F96")
+
+    ax.set_xlim(-1.15, 6.75)
+    ax.set_ylim(-4.25, 0.95)
+    ax.set_axis_off()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.02, bbox_inches="tight",
+                facecolor="white")
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def _kspace_diagram(img: np.ndarray, factor: int, sigma: float, hue: str,
+                    inches=(2.75, 1.5), dpi=200) -> str:
+    """The forward model, drawn from the actual slice: keep the centre of k-space.
+
+    Both panels are this slice's own Fourier transform, so the process box is a
+    measurement of the degradation rather than a picture of one.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    k = np.fft.fftshift(np.fft.fft2(img))
+    h, w = k.shape
+    kh, kw = max(1, h // (2 * factor)), max(1, w // (2 * factor))
+    mask = np.zeros_like(k, dtype=float)
+    mask[h // 2 - kh:h // 2 + kh, w // 2 - kw:w // 2 + kw] = 1.0
+    lg = lambda a: np.log1p(np.abs(a))
+
+    fig, ax = plt.subplots(1, 2, figsize=inches, facecolor="white")
+    for a, (im, ttl) in zip(ax, [(lg(k), "k-space"), (lg(k * mask), "truncated")]):
+        a.imshow(im, cmap="gray", vmin=0, vmax=lg(k).max())
+        a.set_title(ttl, fontsize=5.2, color="#3E434A", pad=2.5)
+        a.set_xticks([]); a.set_yticks([])
+        for sp in a.spines.values():
+            sp.set_linewidth(0.6); sp.set_edgecolor("#8A8F96")
+    ax[0].add_patch(Rectangle((w // 2 - kw, h // 2 - kh), 2 * kw, 2 * kh,
+                              fill=False, edgecolor=hue, linewidth=0.9))
+    fig.text(0.5, 0.015,
+             f"keep the central 1/{factor} per axis, invert, add Rician "
+             f"\u03c3={sigma:g}",
+             ha="center", fontsize=5.0, color="#3E434A")
+    fig.subplots_adjust(wspace=0.12, top=0.86, bottom=0.14)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, pad_inches=0.02, bbox_inches="tight",
+                facecolor="white")
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
 def _mask_overlay(pred: np.ndarray, hue: str) -> np.ndarray:
     """Solid fill in one model's hue wherever it predicted tumor."""
     from matplotlib.colors import to_rgba
@@ -133,11 +258,12 @@ def _mask_overlay(pred: np.ndarray, hue: str) -> np.ndarray:
     return fill
 
 
-def stage_panels(device: str, pool: int) -> tuple[dict, dict, dict]:
+def stage_panels(device: str, pool: int) -> tuple[dict, dict, dict, dict]:
     """Run one real held-out slice through the real models, panel by panel.
 
-    Returns the panels as base64 PNGs, the per-version metrics for that slice,
-    and the degradation settings the models were trained with.
+    Returns the panels and the process diagrams as base64 PNGs, the per-version
+    metrics for that slice, and the degradation settings the models were trained
+    with.
     """
     seg, sr_d, sr_t, size, factor, sigma = _ensure_models(device)
     ds, picks = _pick_slices(seg, sr_d, sr_t, size, factor, sigma, device,
@@ -175,9 +301,20 @@ def stage_panels(device: str, pool: int) -> tuple[dict, dict, dict]:
         "unc": _panel(u, cmap=uncertainty_cmap(on_dark=False), vmax=hi(u)),
         "err": _panel(err, cmap=error_cmap(), vmax=hi(err)),
     }
+    # The process boxes: the forward model measured on this slice, and the two
+    # networks drawn from the modules that were just loaded.
+    from src.palette import LIGHT as _L
+    procs = {
+        "degrade": _kspace_diagram(arr(hr), factor, sigma, _L["true"]),
+        "sr": _unet_diagram(sr_t, _L["distortion"], "SR U-Net, one of two"),
+        "seg": _unet_diagram(seg, _L["tumor_aware"], "Segmentation U-Net",
+                             frozen=True),
+        "mc": _unet_diagram(sr_t, UNCERTAINTY_RAMP[-2], "Same SR U-Net",
+                            passes=10),
+    }
     meta = {"size": size, "factor": factor, "sigma": sigma,
             "case": i, "lesions": rows["low-res"]["lesions"]}
-    return panels, rows, meta
+    return panels, procs, rows, meta
 
 
 def code_structure() -> list[tuple[str, str, int]]:
@@ -278,6 +415,18 @@ CSS = """
     text-align:center; margin:2px 0 0; padding:0; border:0; max-width:none;
     line-height:1.2; word-break:normal}
 
+  /* the process box: what the stage does, drawn from the code that does it */
+  /* fixed height, so the numbered tabs stay on one line across all four stages
+     even though the four diagrams do not share an aspect ratio */
+  .procbox{margin-top:.6rem; height:156px; border:1.6px solid #000; background:#fff;
+    padding:3px; position:relative; z-index:1; display:flex; align-items:center}
+  .procbox img{display:block; width:100%; height:100%; object-fit:contain}
+
+  /* the 2D panels, moved out of the diagram into their own strip */
+  .card{background:#fff; border:1px solid var(--rule); border-radius:6px;
+    padding:1rem; margin-top:.9rem; overflow-x:auto; color:#14161A}
+  .strip{display:flex; gap:.6rem; min-width:760px}
+
   /* the legend, under the stage it describes */
   .legend{margin-top:1rem}
   .bar{display:flex; align-items:baseline; gap:.5rem; padding:.28rem .7rem; color:#fff}
@@ -338,6 +487,41 @@ def _thumb(b64: str, cap: str) -> str:
             f'alt="{cap}"><figcaption>{cap}</figcaption></figure>')
 
 
+def _barbs(x: float, y: float, tx: float, ty: float, head: float = 10.0,
+           deg: float = 28.0) -> str:
+    """The two strokes of an open V head, opening behind a tip on tangent (tx, ty)."""
+    import math
+
+    n = math.hypot(tx, ty) or 1.0
+    tx, ty = tx / n, ty / n
+    out = []
+    for d in (deg, -deg):
+        a = math.radians(d)
+        bx = (-tx) * math.cos(a) - (-ty) * math.sin(a)
+        by = (-tx) * math.sin(a) + (-ty) * math.cos(a)
+        out.append(f'M{x:.1f},{y:.1f} L{x + bx * head:.1f},{y + by * head:.1f}')
+    return " ".join(out)
+
+
+def _merge(w: int = 100, h: int = 96) -> str:
+    """Two branches converging into one arrow, for the stage that pools inputs.
+
+    Both reconstructions are handed to the same frozen detector, so the arrow
+    between those stages is a merge rather than a single sweep: two bends come in
+    from above and below and join a short trunk that carries the one head. Same
+    stroke and same open V as ``_sweep``, so the figure reads as one hand.
+    """
+    y = h / 2
+    join = w - 28
+    branches = (f'<path d="M4,{y - 32:.0f} C34,{y - 32:.0f} 44,{y:.0f} {join},{y:.0f}"/>'
+                f'<path d="M4,{y + 32:.0f} C34,{y + 32:.0f} 44,{y:.0f} {join},{y:.0f}"/>')
+    trunk = f'<path d="M{join},{y:.0f} L{w - 11},{y:.0f}"/>'
+    return (f'<svg class="sweep" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
+            f'aria-hidden="true"><g fill="none" stroke="#14161A" stroke-width="1.5" '
+            f'stroke-linecap="round">{branches}{trunk}'
+            f'<path d="{_barbs(w - 11, y, 1, 0)}"/></g></svg>')
+
+
 def _sweep(bulge: str = "up", w: int = 66, h: int = 96) -> str:
     """A hand-drawn style sweep arrow between two stages of the stack.
 
@@ -360,28 +544,21 @@ def _sweep(bulge: str = "up", w: int = 66, h: int = 96) -> str:
     x3, y3 = w - 10, y_mid + d / 14
 
     # end tangent of a cubic is 3 * (P3 - P2)
-    tx, ty = x3 - x2, y3 - y2
-    n = math.hypot(tx, ty) or 1.0
-    tx, ty = tx / n, ty / n
-    head = 10.0
-    barbs = []
-    for deg in (28, -28):
-        a = math.radians(deg)
-        # rotate the reversed tangent, so both barbs open behind the tip
-        bx = (-tx) * math.cos(a) - (-ty) * math.sin(a)
-        by = (-tx) * math.sin(a) + (-ty) * math.cos(a)
-        barbs.append(f'M{x3:.1f},{y3:.1f} L{x3 + bx * head:.1f},{y3 + by * head:.1f}')
-
     return (f'<svg class="sweep" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
             f'aria-hidden="true"><g fill="none" stroke="#14161A" stroke-width="1.5" '
             f'stroke-linecap="round">'
             f'<path d="M{x0},{y0:.1f} C{x1},{y1:.1f} {x2},{y2:.1f} {x3},{y3:.1f}"/>'
-            f'<path d="{" ".join(barbs)}"/></g></svg>')
+            f'<path d="{_barbs(x3, y3, x3 - x2, y3 - y2)}"/></g></svg>')
 
 
-def _level(no: int, title: str, hue: str, blocks: str, thumbs: str,
+def _proc(b64: str) -> str:
+    """The process box under a plate: what this stage does, not what it output."""
+    return f'<div class="procbox"><img src="data:image/png;base64,{b64}" alt=""></div>'
+
+
+def _level(no: int, title: str, hue: str, blocks: str, proc: str,
            items: list[tuple[str, str, str]]) -> str:
-    """One stage of the stack: plate, then its 2D panels, then a numbered legend.
+    """One stage of the stack: plate, then how the stage works, then its legend.
 
     ``items`` are (label, note, dot hue). The dot hue is the model or field the
     line refers to, so the legend, the 2D panels and the 3D renders all label the
@@ -397,7 +574,7 @@ def _level(no: int, title: str, hue: str, blocks: str, thumbs: str,
         for label, note, dot in items)
     return f"""<div class="level">
       <div class="plate">{blocks}</div>
-      <div class="thumbs">{thumbs}</div>
+      {proc}
       <div class="legend">
         <div class="bar" style="background:{hue}">
           <span class="no">{no}</span><span class="ttl">{title}</span></div>
@@ -408,7 +585,7 @@ def _level(no: int, title: str, hue: str, blocks: str, thumbs: str,
 
 def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    p, rows, meta = stage_panels(device, pool)
+    p, procs, rows, meta = stage_panels(device, pool)
 
     missing = [f for f, _, _ in RENDERS if not os.path.exists(f)]
 
@@ -424,7 +601,7 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
     lv1 = _level(
         1, "Input and degradation", C_TRUE,
         _block(render("brain3d_true.png"), "The scan we start from"),
-        _thumb(p["hr"], "true scan") + _thumb(p["lr"], "degraded"),
+        _proc(procs["degrade"]),
         [("Held-out patient", "", C_TRUE),
          (f"k-space &times;{meta['factor']}", f"Rician &sigma;={meta['sigma']}", GREY)])
 
@@ -432,25 +609,25 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
         2, "Reconstruction", C_BASE,
         (_block(render("brain3d_distortion.png"), "Distortion-optimal", small=True)
          + _block(render("brain3d_tumor_aware.png"), "Tumor-aware", small=True)),
-        _thumb(p["sr_d"], "baseline") + _thumb(p["sr_t"], "ours"),
+        _proc(procs["sr"]),
         [("Pixel error only", "", C_BASE),
          ("Lesion-weighted, ours", "", C_OURS)])
 
     lv3 = _level(
         3, "Detection and safety", C_OURS,
         _block(_overlay_frame() or render("brain3d_true.png"), "All three, overlaid"),
-        _thumb(p["seg_d"], "on baseline") + _thumb(p["seg_t"], "on ours"),
+        _proc(procs["seg"]),
         [("One frozen detector", "", GREY),
          ("Erased or fabricated", "", C_BASE)])
 
     lv4 = _level(
         4, "Uncertainty", C_UNC,
         _block(render("brain3d_uncertainty.png"), "Where the model is unsure"),
-        _thumb(p["unc"], "uncertainty") + _thumb(p["err"], "abs error"),
+        _proc(procs["mc"]),
         [("10 dropout passes", "", C_UNC),
          ("Doubt against error", "", GREY)])
 
-    sw_a, sw_b, sw_c = (_sweep("up"), _sweep("down"), _sweep("up"))
+    sw_a, sw_b, sw_c = (_sweep("up"), _merge(), _sweep("up"))
 
     order = ["low-res", "distortion", "tumor-aware"]
     label = {"low-res": "low-res input", "distortion": "distortion-optimal (baseline)",
@@ -464,6 +641,12 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
 
     modules = "".join(f"<tr><td><code>src/{n}</code></td><td>{d}</td>"
                       f"<td class=n>{loc}</td></tr>" for n, d, loc in code_structure())
+
+    strip = "".join(_thumb(p[k], cap) for k, cap in [
+        ("hr", "true scan"), ("lr", "degraded"), ("sr_d", "baseline"),
+        ("sr_t", "ours"), ("seg_d", "detector on baseline"),
+        ("seg_t", "detector on ours"), ("unc", "uncertainty"),
+        ("err", "abs error")])
 
     entries = "".join(f'<div class="entry"><b>{path}</b><p>{what}</p></div>'
                       for path, what in ENTRY_POINTS)
@@ -491,12 +674,22 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
     <div class="stack">{lv1}{sw_a}{lv2}{sw_b}{lv3}{sw_c}{lv4}</div>
     <figcaption><b>Figure 1.</b> One held-out patient, pulled apart left to right
     into the four stages that act on them. Each plate is a 3D volume this pipeline
-    produced and the panels under it are that stage's 2D output on one slice; the
-    dotted horizontals are alignment guides, not flow. The detector at stage 3 is
-    frozen and shared, which is what makes the two reconstructions at stage 2
-    comparable: the only thing that changes is the image handed to it.</figcaption>
+    produced; the box under it is how that stage works, drawn from the code that
+    does it, so the channel widths, the dropout and the truncated k-space are read
+    off the modules rather than sketched. The dotted horizontals are alignment
+    guides, not flow. The two arrows merging into
+    stage 3 are the point of the study: both reconstructions are read by the same
+    frozen detector, so the only thing that changes between them is the image
+    handed to it.</figcaption>
   </div></div>
   {note}
+
+  <h2>The same slice, stage by stage</h2>
+  <p class="small">The 2D output of each stage on the held-out slice the figure
+  above was built from. Fill is what the frozen detector found, in that model's
+  colour; the blue outline is the true tumor, so an outline with nothing in it is
+  an erased lesion.</p>
+  <div class="card"><div class="strip">{strip}</div></div>
 
   <h2>What that slice scored</h2>
   <p class="small">The same numbers the deck reports, for the single slice drawn
