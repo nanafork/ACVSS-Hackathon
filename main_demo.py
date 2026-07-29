@@ -143,12 +143,10 @@ def _blindness_block() -> str:
         <td class=num>{rec['tumor-aware'][0]:.1f} dB</td>
         <td class=num>{rec['tumor-aware'][1]:.3f}</td></tr>
     </table>
-    <p class="note">{n:,} validation slices, lesion replaced by the median intensity of the
-    surrounding brain. It is {frac:.1f}% of the brain area, so deleting it leaves
-    <b>{psnr_f - rec['tumor-aware'][0]:.1f}&nbsp;dB of headroom over our own best
-    reconstruction</b>. Ordinary blur costs more measured error than removing the tumor.</p>
-    <p class="note"><b>So a model trained on this metric is not told to keep the tumor.</b>
-    Erasure is not a penalty, it is a rounding error.</p>"""
+    <p class="note">{n:,} validation slices, the lesion painted out with surrounding
+    brain. It is {frac:.1f}% of the brain area, so deleting it leaves
+    <b>{psnr_f - rec['tumor-aware'][0]:.1f}&nbsp;dB of headroom</b> over our own best
+    reconstruction.</p>"""
 
 
 ARCH_PNG = "figures/architecture.png"
@@ -403,8 +401,9 @@ PAGE = """<!doctype html>
   .title-slide h1 em{{color:var(--lime)}}
   .title-slide .lede{{color:rgba(255,255,255,.74)}}
   .title-slide .lede b{{color:#fff}}
-  .byline{{font-family:var(--mono); font-size:.76rem; color:rgba(255,255,255,.5);
-    margin-top:2.2rem}}
+  .byline{{font-family:var(--mono); font-size:clamp(.92rem,1.5vw,1.12rem);
+    letter-spacing:.02em; line-height:1.75; color:rgba(255,255,255,.78);
+    margin-top:2.4rem; max-width:62ch}}
 
   .vitals{{display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:1.4rem}}
   .vitals.four{{grid-template-columns:repeat(4,1fr); gap:.8rem}}
@@ -606,13 +605,10 @@ PAGE = """<!doctype html>
         </div>
       </div>
     </div>
-    <p class="note">A portable scanner runs at about <b>0.055&nbsp;tesla</b>, a fiftieth of a
-    hospital magnet. A weaker magnet means a weaker signal, so the high frequencies in
-    k-space are buried in noise: the image comes out blurry and grainy. The accepted fix
-    is super-resolution, and <b>that fix is where our question starts</b>.</p>
-    <p class="note">Ghana counts from the West Africa MRI survey (Ogbole et&nbsp;al., Pan
-    African Medical Journal 2018) and the 2017 Ghana audit; regional figures from Anazodo
-    et&nbsp;al., Nature Communications 2024.</p>
+    <p class="note"><b>0.055&nbsp;tesla</b> is a fiftieth of a hospital magnet:
+    weaker signal, blurrier image.</p>
+    <p class="note">Ogbole et&nbsp;al. 2018 &middot; Ghana MRI audit 2017 &middot;
+    Anazodo et&nbsp;al. 2024.</p>
   </section>
 
   <section class="slide">
@@ -640,11 +636,8 @@ PAGE = """<!doctype html>
         <p>Lesions <b>erased</b> and <b>fabricated</b>, split by size, always against what the
         segmenter already misses on an untouched scan.</p></div>
     </div>
-    <p class="note"><b>The clever part is what it cannot do any more.</b> The model can no
-    longer buy score by smoothing a lesion away, because the region it used to get away with
-    ignoring is now the expensive one. The loss points at the abnormality instead of at the
-    smoothness of the picture.</p>
-    <p class="note">Corrective, not architectural: no new network, three small U-Nets.</p>
+    <p class="note">The model can no longer buy score by smoothing a lesion away.
+    Corrective, not architectural: no new network, three small U-Nets.</p>
   </section>
 
   <section class="slide">
@@ -652,8 +645,8 @@ PAGE = """<!doctype html>
     <h2>Degrade a real scan, reconstruct it two ways, and ask one frozen
     segmentation network what it can still find.</h2>
     {arch}
-    <p class="note"><b>No GAN, deliberately.</b> An adversarial loss rewards inventing plausible
-    tissue, which is the failure we are measuring. 17,233 slices, 468 patients (BraTS).</p>
+    <p class="note"><b>No GAN, deliberately:</b> an adversarial loss rewards inventing
+    plausible tissue. 17,233 slices, 468 patients.</p>
   </section>
 
   <section class="slide">
@@ -689,20 +682,10 @@ PAGE = """<!doctype html>
       <div class="lscale"><div><span>0%</span>
         <span class="mid">of enhancing lesion components missed</span><span>70%</span></div></div>
       <div class="lkey">
-        <span>Same frozen segmenter in all three rows. Only the image it is given changes,
-        so the difference is caused by the reconstruction and not by a different detector.</span>
+        <span>Same frozen segmenter in all three rows: only the image changes.</span>
       </div>
     </div>
 
-    <div class="take" style="margin-top:1.1rem">
-      <h3>Read the bottom bar against the middle one</h3>
-      <p>Both reconstructions recover tumor the degradation destroyed. Ours recovers
-      <b>6.7 points more</b>, and the image quality is genuinely matched.</p>
-      {matched}
-      <p>The cost is hallucination, 0.266 to 0.387.</p>
-      <div class="pill"><b>Validation, not test.</b> The 94 test patients get one
-      evaluation, once, and that is the number we will stand behind.</div>
-    </div>
   </section>
 
   <section class="slide">
@@ -711,20 +694,16 @@ PAGE = """<!doctype html>
     <div class="readout">
       <div class="ev">
       {floor_chart}
-        <p class="note">Same 70 validation patients, 9,490 lesion components. Grey is what
-        the frozen segmenter misses on the <b>untouched</b> scan; the block on top of it is the
-        excess each objective is responsible for.</p>
+        <p class="note">70 patients, 9,490 components. Grey is missed on the
+        <b>untouched</b> scan; the block above it is what each objective adds.</p>
       </div>
       <div class="take">
         <h3>Read the large group first</h3>
-        <p>A lesion over 200&nbsp;px is missed about <b>1% of the time</b> by either model, so
-        nothing here says half of all tumors vanish.</p>
-        <p>The rate is driven by the small group: <b>71% of all components are under
-        50&nbsp;px</b>, and that is where our objective earns its keep, 13.5 points of added
-        erasure down to 4.7.</p>
-        <div class="pill">The same pipeline on whole tumor, a tenth of the image, does nothing
-        at all. The loss only helps where the structure is small enough for a pixel score to
-        ignore it.</div>
+        <p>Over 200&nbsp;px, either model misses about <b>1%</b>. Nothing here says half of
+        all tumors vanish.</p>
+        <p><b>71% of components are under 50&nbsp;px</b>, and that is where the objective
+        earns its keep: 13.5 points added down to 4.7.</p>
+        <div class="pill">On whole tumor, a tenth of the image, it does nothing at all.</div>
       </div>
     </div>
   </section>
@@ -786,9 +765,7 @@ PAGE = """<!doctype html>
       <figcaption><b>Distortion-optimal &mdash; baseline.</b> Small lesions dropped.</figcaption></figure>
     {unc_panel}
     </div>
-    <p class="note">A blue shell with nothing inside it is a lesion the model lost. One
-    held-out patient, {size}&times;{size} slices, k-space factor {factor}, Rician
-    &sigma;={sigma}.</p>
+    <p class="note">A blue shell with nothing inside it is a lesion the model lost.</p>
   </section>
 
   <section class="slide extra">
@@ -829,39 +806,39 @@ PAGE = """<!doctype html>
 
   <section class="slide">
     <div class="tag"><span class="sec">06</span>Next steps</div>
-    <h2>The next number we produce is the one that counts: one test evaluation, 94 patients,
-    once.</h2>
-    <div class="steps">
-      <div class="step"><div class="n">01</div><h3>One ruler</h3>
-        <p>All three objectives against a single frozen segmenter. Written, needs a GPU box.</p></div>
-      <div class="step"><div class="n">02</div><h3>The test run</h3>
-        <p>One evaluation, one configuration, 94 untouched patients. That is the number we will
-        stand behind.</p></div>
-      <div class="step"><div class="n">03</div><h3>Abstain, do not guess</h3>
-        <p>Flag where MC-dropout variance is high instead of returning a confidently crisp
-        image. AUROC 0.85, no GPU needed.</p></div>
-      <div class="step"><div class="n">04</div><h3>A real cheap scan</h3>
-        <p>Low-field acquisition or BraTS-Africa. Ours simulates resolution loss, not low-field
-        contrast.</p></div>
+    <h2>Next: generative models, tested with the readout we just built.</h2>
+    <div class="terms">
+      <div class="term" style="border-left-color:var(--erased)">
+        <h3>Why generative</h3>
+        <p>Diffusion and adversarial models make the sharpest low-field images anyone has
+        produced. They are also the ones most likely to invent tissue.</p></div>
+      <div class="term" style="border-left-color:var(--safe)">
+        <h3>Why we can now try them</h3>
+        <p>We can measure what they lose and what they fabricate. Sharpness no longer has to
+        be taken on trust.</p></div>
+      <div class="term">
+        <h3>Then the one number</h3>
+        <p>A single evaluation on the 94 patients nothing has touched.</p></div>
     </div>
+    <p class="note">A safety metric is what makes a generative model testable rather than
+    impressive.</p>
   </section>
 
-  <section class="slide">
-    <div class="tag"><span class="sec">07</span>What this is not</div>
+  <section class="slide extra">
+    <div class="tag backup">What this is not</div>
     <h2>Five limits we would rather state than be asked.</h2>
     <div class="scope"><ul>
-      <li><b>Only small lesions.</b> On whole tumor, 10.9% of the image, the same pipeline
-          shows no benefit at all: 64.6% vs 63.7%. Exactly what the theory predicts.</li>
-      <li><b>Enhancement can make detection worse.</b> On whole tumor both models erase more
-          than the raw low-res input, while gaining 3&nbsp;dB.</li>
-      <li><b>Simulated degradation.</b> Resolution loss and noise, not low-field contrast.</li>
-      <li><b>The fix costs hallucination.</b> 0.266 to 0.387. Which error a clinic tolerates is
-          a clinical decision.</li>
-      <li><b>Validation, not test.</b> One evaluation on 94 untouched patients is still to
-          come.</li>
+      <li><b>Only small lesions.</b> On whole tumor, no benefit at all: 64.6% vs 63.7%.</li>
+      <li><b>Enhancement can make detection worse.</b> On whole tumor both models erase
+          more than the raw input.</li>
+      <li><b>Simulated degradation.</b> Resolution loss and noise, not low-field
+          contrast.</li>
+      <li><b>The fix costs hallucination.</b> 0.266 to 0.387.</li>
+      <li><b>Validation, not test.</b> The 94 test patients are still untouched.</li>
+      
     </ul></div>
-    <p class="note">The segmenter's own floor, our audit, the tradeoff dial and the per-slice
-    evidence are on the backup slides. Press <b>B</b>.</p>
+    <p class="note">The floor, our audit, the tradeoff dial and the per-slice evidence
+    are on the backup slides. Press <b>B</b>.</p>
   </section>
 
   {roles}
