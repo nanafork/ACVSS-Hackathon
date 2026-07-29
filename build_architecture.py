@@ -285,8 +285,8 @@ CSS = """
   .bar .ttl{font-family:var(--mono); font-size:.62rem; letter-spacing:.14em;
     text-transform:uppercase}
   .items{list-style:none; margin:.45rem 0 0; padding:0}
-  .items li{display:flex; align-items:baseline; gap:.5rem; padding:.2rem 0 .2rem .7rem;
-    font-family:var(--mono); font-size:.62rem; letter-spacing:.04em; line-height:1.35;
+  .items li{display:flex; align-items:baseline; gap:.5rem; padding:.28rem 0 .28rem .7rem;
+    font-family:var(--mono); font-size:.66rem; letter-spacing:.06em; line-height:1.35;
     text-transform:uppercase; color:#2A2E33}
   .items li span{flex:1 1 auto}
   .items li i{flex:0 0 auto; width:7px; height:7px; border-radius:50%; display:block;
@@ -425,42 +425,30 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
         1, "Input and degradation", C_TRUE,
         _block(render("brain3d_true.png"), "The scan we start from"),
         _thumb(p["hr"], "true scan") + _thumb(p["lr"], "degraded"),
-        [("Real BraTS, held-out patient", "no model has seen it", C_TRUE),
-         (f"k-space truncation &times;{meta['factor']}", "resolution loss", GREY),
-         ("Rician noise", f"&sigma;={meta['sigma']}, the noise magnitude MRI follows", GREY),
-         ("Degraded scan is the only input", "an exact reference is kept", GREY),
-         ("src/degrade.py", "", GREY)])
+        [("Held-out patient", "", C_TRUE),
+         (f"k-space &times;{meta['factor']}", f"Rician &sigma;={meta['sigma']}", GREY)])
 
     lv2 = _level(
         2, "Reconstruction", C_BASE,
         (_block(render("brain3d_distortion.png"), "Distortion-optimal", small=True)
          + _block(render("brain3d_tumor_aware.png"), "Tumor-aware", small=True)),
         _thumb(p["sr_d"], "baseline") + _thumb(p["sr_t"], "ours"),
-        [("Two SR U-Nets", "identical architecture, data, schedule", GREY),
-         ("Distortion-optimal", "pixel error only", C_BASE),
-         ("Tumor-aware", "lesion-weighted, ours", C_OURS),
-         ("No GAN, no pretrained weights", "realism rewards invention", GREY),
-         ("src/models.py, src/losses.py", "", GREY)])
+        [("Pixel error only", "", C_BASE),
+         ("Lesion-weighted, ours", "", C_OURS)])
 
     lv3 = _level(
         3, "Detection and safety", C_OURS,
         _block(_overlay_frame() or render("brain3d_true.png"), "All three, overlaid"),
         _thumb(p["seg_d"], "on baseline") + _thumb(p["seg_t"], "on ours"),
-        [("One frozen segmenter", "reads every image", GREY),
-         ("Only the image changes", "so the difference is the reconstruction", GREY),
-         ("Fill = found, outline = true tumor", "a bare outline is an erasure", C_TRUE),
-         ("Lesions erased, lesions fabricated", "by lesion size", C_BASE),
-         ("src/metrics.py", "", GREY)])
+        [("One frozen detector", "", GREY),
+         ("Erased or fabricated", "", C_BASE)])
 
     lv4 = _level(
         4, "Uncertainty", C_UNC,
         _block(render("brain3d_uncertainty.png"), "Where the model is unsure"),
         _thumb(p["unc"], "uncertainty") + _thumb(p["err"], "abs error"),
-        [("Monte Carlo dropout", "10 stochastic passes", C_UNC),
-         ("Variance across passes", "the model's own doubt", C_UNC),
-         ("Is the doubt where the error is?", "uncertainty vs error AUROC", GREY),
-         ("Restacked per-slice masks", "marching cubes", GREY),
-         ("src/uncertainty.py, render_3d.py", "", GREY)])
+        [("10 dropout passes", "", C_UNC),
+         ("Doubt against error", "", GREY)])
 
     sw_a, sw_b, sw_c = (_sweep("up"), _sweep("down"), _sweep("up"))
 
@@ -501,16 +489,11 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
   <h2>The pipeline</h2>
   <div class="figure"><div class="fig-inner">
     <div class="stack">{lv1}{sw_a}{lv2}{sw_b}{lv3}{sw_c}{lv4}</div>
-    <figcaption><b>Figure 1.</b> The tumor-aware super-resolution pipeline, drawn
-    as an exploded stack: one patient, pulled apart left to right into the four
-    stages that act on them. Every plate is a 3D volume this pipeline produced, and the small
-    panels beside each plate are the 2D output of that same stage on one held-out
-    slice. The sweeping arrows carry the direction of travel; the dotted verticals
-    are alignment guides rather than flow, because the levels are one brain pulled
-    apart, not four different ones. The degradation is applied on the
-    fly, so every low-resolution input keeps an exact high-resolution reference and
-    no paired low-field acquisition is required. The segmentation network at stage 3
-    is frozen and shared, which is what makes the two reconstructions at stage 2
+    <figcaption><b>Figure 1.</b> One held-out patient, pulled apart left to right
+    into the four stages that act on them. Each plate is a 3D volume this pipeline
+    produced and the panels under it are that stage's 2D output on one slice; the
+    dotted horizontals are alignment guides, not flow. The detector at stage 3 is
+    frozen and shared, which is what makes the two reconstructions at stage 2
     comparable: the only thing that changes is the image handed to it.</figcaption>
   </div></div>
   {note}
