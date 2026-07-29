@@ -234,7 +234,10 @@ PAGE = """<!doctype html>
   .deck{{max-width:1100px; margin:0 auto; padding:1.2rem clamp(1rem,4vw,2rem) 6.5rem;
     min-height:100vh}}
   .slide{{display:none; animation:fade .34s cubic-bezier(.2,.7,.2,1)}}
-  .slide.on{{display:block}}
+  /* vertically centred, so a short slide does not leave a lake of space under it
+     while a tall one still grows downward instead of being clipped */
+  .slide.on{{display:flex; flex-direction:column; justify-content:center;
+    min-height:calc(100vh - 9rem)}}
   @keyframes fade{{from{{opacity:0; transform:translateY(10px)}} to{{opacity:1; transform:none}}}}
   @media(prefers-reduced-motion:reduce){{.slide{{animation:none}}}}
 
@@ -372,6 +375,26 @@ PAGE = """<!doctype html>
     border-radius:12px; padding:.7rem}}
   .arch img{{display:block; width:100%; height:auto}}
 
+  /* definition cards: an accent rail on the left, a term, then what it means */
+  .terms{{display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:1.3rem}}
+  .term{{background:var(--card); border:1px solid var(--border); border-radius:12px;
+    border-left:4px solid var(--accent); padding:1rem 1.15rem}}
+  .term h3{{font-size:1rem; margin:0 0 .4rem; letter-spacing:-.01em}}
+  .term p{{font-size:.86rem; color:var(--ink-mid); margin:0}}
+  .term p + p{{margin-top:.45rem}}
+  .term code{{font-size:.8rem}}
+
+  /* evidence on the left, what to take from it on the right */
+  .readout{{display:grid; grid-template-columns:1.5fr 1fr; gap:1.6rem; align-items:start;
+    margin-top:1.2rem}}
+  .readout > .ev{{min-width:0}}
+  .take h3{{font-size:1rem; color:var(--accent-deep); margin:.2rem 0 .6rem}}
+  .take p{{font-size:.86rem; color:var(--ink-mid); margin:0 0 .55rem}}
+  .take .pill{{background:var(--card-2); border:1px solid var(--border);
+    border-radius:10px; padding:.6rem .8rem; font-size:.84rem; color:var(--ink)}}
+  @media(max-width:900px){{.readout{{grid-template-columns:1fr}}
+    .terms{{grid-template-columns:1fr}}}}
+
   .steps{{display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:1.2rem}}
   .steps.three{{grid-template-columns:repeat(3,1fr)}}
   .step{{background:var(--card); border:1px solid var(--border); border-radius:14px;
@@ -424,7 +447,7 @@ PAGE = """<!doctype html>
   <section class="slide">
     <div class="tag"><span class="sec">01</span>Why this matters</div>
     <h2>Cheap, low-quality scanners are the only realistic way to widen MRI access.</h2>
-    <div class="vitals four">
+    <div class="vitals">
       <div class="vital"><div class="k">Ghana</div>
         <div class="v" style="color:var(--erased)">14<span class="u">scanners</span></div>
         <div class="d">for more than 30 million people, and two thirds of them sit in
@@ -435,12 +458,9 @@ PAGE = """<!doctype html>
       <div class="vital"><div class="k">High-income countries</div>
         <div class="v" style="color:var(--ink-mid)">37<span class="u">per million</span></div>
         <div class="d">up to this many, for the same imaging need</div></div>
-      <div class="vital safe"><div class="k">The route in</div>
-        <div class="v" style="color:var(--safe)">0.055<span class="u">tesla</span></div>
-        <div class="d">portable, robust enough to move, and about a fiftieth of a
-          hospital magnet</div></div>
     </div>
-    <p class="note">A weaker magnet means a weaker signal, so the high frequencies in
+    <p class="note">A portable scanner runs at about <b>0.055&nbsp;tesla</b>, a fiftieth of a
+    hospital magnet. A weaker magnet means a weaker signal, so the high frequencies in
     k-space are buried in noise: the image comes out blurry and grainy. The accepted fix
     is super-resolution, and <b>that fix is where our question starts</b>.</p>
     <p class="note">Ghana counts from the West Africa MRI survey (Ogbole et&nbsp;al., Pan
@@ -457,17 +477,26 @@ PAGE = """<!doctype html>
 
   <section class="slide">
     <div class="tag"><span class="sec">03</span>Contribution</div>
-    <h2>We measure the erasure that a quality metric hides, then train against it.</h2>
-    <div class="steps three">
-      <div class="step"><div class="n">01</div><h3>A safety readout</h3>
-        <p>Lesions <b>erased</b> and <b>fabricated</b>, by lesion size, against the detector's
-        own floor.</p></div>
-      <div class="step"><div class="n">02</div><h3>A tumor-aware objective</h3>
-        <p>Lesion-weighted, plus a consistency term that punishes inventing tumor as well as
-        losing it.</p></div>
-      <div class="step"><div class="n">03</div><h3>An evaluation that holds</h3>
-        <p>Real BraTS, split by patient, one frozen segmenter, an untouched test split.</p></div>
+    <h2>Penalise the model heavily for mistakes where the tumor is.</h2>
+    <div class="terms">
+      <div class="term" style="border-left-color:var(--safe)">
+        <h3>The loss</h3>
+        <p>Pixel error inside the tumor mask is <b>multiplied by a factor</b>, so an error on
+        the lesion costs far more than the same error in healthy tissue.</p>
+        <p><code>L = |pred &minus; true| &times; (1 + w&middot;mask)</code>, w=40</p></div>
+      <div class="term" style="border-left-color:var(--erased)">
+        <h3>The second term</h3>
+        <p>Supervises the <b>segmenter's output</b> rather than the pixels, so inventing a
+        tumor is punished as well as losing one.</p></div>
+      <div class="term">
+        <h3>The readout</h3>
+        <p>Lesions <b>erased</b> and <b>fabricated</b>, split by size, always against what the
+        segmenter already misses on an untouched scan.</p></div>
     </div>
+    <p class="note"><b>The clever part is what it cannot do any more.</b> The model can no
+    longer buy score by smoothing a lesion away, because the region it used to get away with
+    ignoring is now the expensive one. The loss points at the abnormality instead of at the
+    smoothness of the picture.</p>
     <p class="note">Corrective, not architectural: no new network, three small U-Nets.</p>
   </section>
 
@@ -518,37 +547,54 @@ PAGE = """<!doctype html>
       </div>
     </div>
 
-    <p class="note">Matched quality: brain-masked PSNR 24.51 vs 24.28. The cost is
-    hallucination, 0.266 to 0.387. <b>Validation, not test</b>: the 94 test patients get one
-    evaluation, once.</p>
+    <div class="take" style="margin-top:1.1rem">
+      <h3>Read the bottom bar against the middle one</h3>
+      <p>Both reconstructions recover tumor the degradation destroyed. Ours recovers
+      <b>6.7 points more</b>, at matched image quality: brain-masked PSNR 24.51 against
+      24.28.</p>
+      <p>The cost is hallucination, 0.266 to 0.387.</p>
+      <div class="pill"><b>Validation, not test.</b> The 94 test patients get one
+      evaluation, once, and that is the number we will stand behind.</div>
+    </div>
   </section>
 
   <section class="slide">
     <div class="tag"><span class="sec">05</span>Result &middot; broken down by lesion size</div>
     <h2>Large lesions are almost never lost. Small ones are the whole problem.</h2>
-    <p class="note">Same 70 patients, 9,490 lesion components. Each column is the share the
-    detector could no longer find.</p>
-    <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
-      border-radius:14px; padding:.4rem">
-      <tr>
-        <th>lesion size</th><th class=num>how many</th>
-        <th class=num>degraded scan<br><span style="font-weight:400;text-transform:none;letter-spacing:0">before reconstruction</span></th>
-        <th class=num>standard SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(baseline)</span></th>
-        <th class=num>tumor-aware SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(ours)</span></th>
-      </tr>
-      <tr><td><b>small</b> &lt;50&nbsp;px</td><td class=num>6,762 <span style="color:var(--ink-light)">(71%)</span></td>
-        <td class=num>82.1%</td><td class=num style="color:var(--erased)">78.6%</td>
-        <td class=num style="color:var(--safe)"><b>69.8%</b></td></tr>
-      <tr><td><b>medium</b> 50&ndash;200&nbsp;px</td><td class=num>1,005</td>
-        <td class=num>30.0%</td><td class=num style="color:var(--erased)">16.4%</td>
-        <td class=num style="color:var(--safe)"><b>13.5%</b></td></tr>
-      <tr><td><b>large</b> &gt;200&nbsp;px</td><td class=num>1,723</td>
-        <td class=num>3.2%</td><td class=num style="color:var(--erased)">1.2%</td>
-        <td class=num style="color:var(--safe)"><b>0.9%</b></td></tr>
-    </table>
-    <p class="note"><b>Large lesions are essentially never lost</b>, so nothing here says half
-    of all tumors vanish. The rate is driven by the small components, 71% of the count, and that
-    is where our objective helps: 78.6 to 69.8.</p>
+    <div class="readout">
+      <div class="ev">
+      <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
+        border-radius:14px; padding:.4rem">
+        <tr>
+          <th>lesion size</th><th class=num>how many</th>
+          <th class=num>degraded scan<br><span style="font-weight:400;text-transform:none;letter-spacing:0">before reconstruction</span></th>
+          <th class=num>standard SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(baseline)</span></th>
+          <th class=num>tumor-aware SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(ours)</span></th>
+        </tr>
+        <tr><td><b>small</b> &lt;50&nbsp;px</td><td class=num>6,762 <span style="color:var(--ink-light)">(71%)</span></td>
+          <td class=num>82.1%</td><td class=num style="color:var(--erased)">78.6%</td>
+          <td class=num style="color:var(--safe)"><b>69.8%</b></td></tr>
+        <tr><td><b>medium</b> 50&ndash;200&nbsp;px</td><td class=num>1,005</td>
+          <td class=num>30.0%</td><td class=num style="color:var(--erased)">16.4%</td>
+          <td class=num style="color:var(--safe)"><b>13.5%</b></td></tr>
+        <tr><td><b>large</b> &gt;200&nbsp;px</td><td class=num>1,723</td>
+          <td class=num>3.2%</td><td class=num style="color:var(--erased)">1.2%</td>
+          <td class=num style="color:var(--safe)"><b>0.9%</b></td></tr>
+      </table>
+        <p class="note">Same 70 patients, 9,490 lesion components. Each column is the share
+        the segmenter could no longer find.</p>
+      </div>
+      <div class="take">
+        <h3>Read the large row first</h3>
+        <p>A lesion over 200&nbsp;px is missed about <b>1% of the time</b> by either model, so
+        nothing here says half of all tumors vanish.</p>
+        <p>The rate is driven by the top row: <b>71% of components are under 50&nbsp;px</b>,
+        and that is where our objective earns its keep, 78.6 down to 69.8.</p>
+        <div class="pill">The same pipeline on whole tumor, a tenth of the image, does nothing
+        at all. The loss only helps where the structure is small enough for a pixel score to
+        ignore it.</div>
+      </div>
+    </div>
   </section>
 
   <section class="slide extra">
