@@ -201,6 +201,39 @@ def _matched_stats() -> str:
     return f'<div class="statrow">{"".join(cells)}</div>'
 
 
+def _quality_table() -> str:
+    """PSNR, SSIM and Dice for the three images, read from the validation run.
+
+    This is the slide that earns the phrase "at matched quality": if the two
+    reconstructions were not level here, the erasure difference would just be a
+    quality difference wearing a safety costume.
+    """
+    res = _val_results()
+    if not res:
+        return ""
+    rows = [("low-res input", "low-res", "var(--ink-light)"),
+            ("standard SR (baseline)", "distortion", "var(--erased)"),
+            ("tumor-aware SR (ours)", "tumor-aware", "var(--safe)")]
+    body = ""
+    for label, key, hue in rows:
+        r = res.get(key if key != "low-res" else "lowres")
+        if not r:
+            continue
+        strong = ' style="color:%s"' % hue if key != "low-res" else ""
+        body += (f"<tr><td{strong}><b>{label}</b></td>"
+                 f"<td class=num>{r['psnr_brain']:.2f}</td>"
+                 f"<td class=num>{r['ssim']:.3f}</td>"
+                 f"<td class=num>{r['dice']:.3f}</td></tr>")
+    return f"""<table style="margin-top:1.4rem; background:var(--card);
+      border:1px solid var(--border); border-radius:14px; padding:.5rem">
+      <tr><th>image</th>
+        <th class=num>PSNR (dB)<br><span style="font-weight:400;text-transform:none;letter-spacing:0">inside the brain</span></th>
+        <th class=num>SSIM</th>
+        <th class=num>Dice<br><span style="font-weight:400;text-transform:none;letter-spacing:0">segmenter vs truth</span></th></tr>
+      {body}
+    </table>"""
+
+
 def _floor_chart() -> str:
     """Erasure by lesion size as the floor plus what each model adds to it.
 
@@ -641,6 +674,26 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
+    <div class="tag"><span class="sec">06</span>Next steps</div>
+    <h2>Next: generative models, tested with the readout we just built.</h2>
+    <div class="terms">
+      <div class="term" style="border-left-color:var(--erased)">
+        <h3>Why generative</h3>
+        <p>Diffusion and adversarial models make the sharpest low-field images anyone has
+        produced. They are also the ones most likely to invent tissue.</p></div>
+      <div class="term" style="border-left-color:var(--safe)">
+        <h3>Why we can now try them</h3>
+        <p>We can measure what they lose and what they fabricate. Sharpness no longer has to
+        be taken on trust.</p></div>
+      <div class="term">
+        <h3>Then the one number</h3>
+        <p>A single evaluation on the 94 patients nothing has touched.</p></div>
+    </div>
+    <p class="note">A safety metric is what makes a generative model testable rather than
+    impressive.</p>
+  </section>
+
+  <section class="slide">
     <div class="tag"><span class="sec">04</span>Method</div>
     <h2>Degrade a real scan, reconstruct it two ways, and ask one frozen
     segmentation network what it can still find.</h2>
@@ -736,6 +789,14 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
+    <div class="tag"><span class="sec">04</span>Result &middot; image quality</div>
+    <h2>The two reconstructions are level on every quality metric we are judged by.</h2>
+    {quality}
+    <p class="note">70 unseen patients. If these rows were not level, the erasure
+    difference would be a quality difference wearing a safety costume.</p>
+  </section>
+
+  <section class="slide">
     <div class="tag"><span class="sec">05</span>Result &middot; four viewports</div>
     <h2>The lesions the baseline loses show up in 3D as empty blue shells.</h2>
     <div class="panels">
@@ -784,26 +845,6 @@ PAGE = """<!doctype html>
     all trained from scratch. No pretrained weights and no adversarial loss: a GAN rewards
     output that merely looks like plausible tissue, which is the mechanism behind the
     hallucination we are trying to measure.</p>
-  </section>
-
-  <section class="slide">
-    <div class="tag"><span class="sec">06</span>Next steps</div>
-    <h2>Next: generative models, tested with the readout we just built.</h2>
-    <div class="terms">
-      <div class="term" style="border-left-color:var(--erased)">
-        <h3>Why generative</h3>
-        <p>Diffusion and adversarial models make the sharpest low-field images anyone has
-        produced. They are also the ones most likely to invent tissue.</p></div>
-      <div class="term" style="border-left-color:var(--safe)">
-        <h3>Why we can now try them</h3>
-        <p>We can measure what they lose and what they fabricate. Sharpness no longer has to
-        be taken on trust.</p></div>
-      <div class="term">
-        <h3>Then the one number</h3>
-        <p>A single evaluation on the 94 patients nothing has touched.</p></div>
-    </div>
-    <p class="note">A safety metric is what makes a generative model testable rather than
-    impressive.</p>
   </section>
 
   <section class="slide extra">
@@ -1105,6 +1146,7 @@ def build(out: str = OUT, device: str | None = None, n_slices: int = 3):
         blindness=_blindness_block(), roles=_roles_block(), byline=_byline(),
         arch=_arch_block(), photo=_photo_block(),
         matched=_matched_stats(), floor_chart=_floor_chart(),
+        quality=_quality_table(),
         size=size, factor=factor, sigma=sigma,
     )
     with open(out, "w") as f:

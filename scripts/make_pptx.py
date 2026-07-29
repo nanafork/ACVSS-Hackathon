@@ -23,6 +23,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
 OUT = "deck.pptx"
+VAL_RUN = "results/val/val_w40_sl0.0.json"
 
 # The deck's own palette, so the PowerPoint and the HTML agree.
 GREEN = RGBColor(0x0B, 0x53, 0x40)      # brand, chrome only
@@ -230,6 +231,57 @@ def result(prs):
     return s
 
 
+def quality(prs):
+    """The table that earns the phrase "at matched quality"."""
+    import json
+    import os
+
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    _bg(s, PAPER)
+    _header(s, "04  Result  ·  image quality")
+    _headline(s, "The two reconstructions are level on every quality metric we are "
+                 "judged by.")
+
+    rows = [("low-res input", "lowres", SOFT),
+            ("standard SR (baseline)", "distortion", BASE),
+            ("tumor-aware SR (ours)", "tumor-aware", OURS)]
+    res = {}
+    if os.path.exists(VAL_RUN):
+        res = json.load(open(VAL_RUN))["results"]
+
+    cols = [Inches(4.6), Inches(2.4), Inches(2.0), Inches(2.4)]
+    heads = ["image", "PSNR (dB), in brain", "SSIM", "Dice, segmenter vs truth"]
+    y = Inches(2.9)
+    x = MARGIN
+    for w, head in zip(cols, heads):
+        _text(s, x, y, w, Inches(0.5), head, size=14, color=SOFT, font=MONO,
+              caps=True)
+        x += w
+    _rule(s, y + Inches(0.52))
+
+    y += Inches(0.72)
+    for label, key, hue in rows:
+        r = res.get(key)
+        if not r:
+            continue
+        vals = [label, f"{r['psnr_brain']:.2f}", f"{r['ssim']:.3f}",
+                f"{r['dice']:.3f}"]
+        x = MARGIN
+        for w, v, first in zip(cols, vals, [True, False, False, False]):
+            _text(s, x, y, w, Inches(0.55), v, size=19,
+                  color=hue if first else INK, bold=first,
+                  font=SANS if first else MONO)
+            x += w
+        _rule(s, y + Inches(0.6))
+        y += Inches(0.82)
+
+    _text(s, MARGIN, y + Inches(0.3), W - 2 * MARGIN, Inches(0.8),
+          "70 unseen patients. If these rows were not level, the erasure difference "
+          "would be a quality difference wearing a safety costume.", size=16,
+          color=SOFT, spacing=1.25)
+    return s
+
+
 def viewports(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     _bg(s, PAPER)
@@ -284,7 +336,8 @@ def next_steps(prs):
 def build(out: str = OUT) -> str:
     prs = Presentation()
     prs.slide_width, prs.slide_height = W, H
-    for fn in (title, access, contribution, method, result, viewports, next_steps):
+    for fn in (title, access, contribution, next_steps, method, result, quality,
+               viewports):
         fn(prs)
     prs.save(out)
     print(f"wrote {out} ({len(prs.slides.__iter__.__self__._sldIdLst)} slides)")
