@@ -452,7 +452,9 @@ PAGE = """<!doctype html>
 
   /* 2x2 rather than 1x4: at four across, each brain was ~240px and the
      difference between a preserved and an erased lesion stopped being legible. */
-  .panels{{display:grid; grid-template-columns:repeat(2,1fr); gap:1.1rem; margin-top:1.2rem}}
+  /* all four viewports in one row: they are read side by side, not scrolled */
+  .panels{{display:grid; grid-template-columns:repeat(4,1fr); gap:.7rem; margin-top:1.1rem}}
+  .panels figcaption{{font-size:.66rem; padding:.45rem .55rem; line-height:1.3}}
   figure{{margin:0; border:1px solid var(--border); border-radius:14px; overflow:hidden;
     background:var(--card)}}
   figure img{{display:block; width:100%; height:auto; background:var(--navy)}}
@@ -688,8 +690,8 @@ PAGE = """<!doctype html>
 
   </section>
 
-  <section class="slide">
-    <div class="tag"><span class="sec">05</span>Result &middot; broken down by lesion size</div>
+  <section class="slide extra">
+    <div class="tag backup">Result &middot; broken down by lesion size</div>
     <h2>Large lesions are almost never lost. Small ones are the whole problem.</h2>
     <div class="readout">
       <div class="ev">
