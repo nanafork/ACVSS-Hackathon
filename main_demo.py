@@ -15,7 +15,7 @@ chip, seven minutes end to end:
                        reconstructions, measured
    4 contribution       a safety readout, a tumor-aware objective, an
                        evaluation that can carry the claim
-   5 method             degrade, reconstruct twice, one frozen detector, score
+   5 method             the architecture figure, built by build_architecture.py
    6 result             the erasure ladder
    7 result             the same thing broken down by lesion size
    8 result             the 3D viewports, which is the live demo
@@ -24,7 +24,7 @@ chip, seven minutes end to end:
 
 Anything else carries ``class="slide extra"`` and lives on a second track,
 reached with B or the Backup button: the tradeoff dial, the rotating overlay, the
-per-slice 2D evidence, how the 3D is assembled, the detector's own floor, our own
+per-slice 2D evidence, how the 3D is assembled, the segmenter's own floor, our own
 audit, the roles and the credits. The dots and the counter only ever count the
 ten, so material kept for questions cannot quietly lengthen the deck.
 
@@ -151,6 +151,36 @@ def _blindness_block() -> str:
     Erasure is not a penalty, it is a rounding error.</p>"""
 
 
+ARCH_PNG = "figures/architecture.png"
+
+
+def _arch_block() -> str:
+    """The architecture figure for the method slide.
+
+    Built by ``python build_architecture.py --png``, which renders the same
+    figure that ``architecture.html`` shows. If it has not been generated the
+    slide falls back to the four-step description, so the deck always builds.
+    """
+    import os
+
+    if os.path.exists(ARCH_PNG):
+        return (f'<figure class="arch"><img src="data:image/png;base64,'
+                f'{_b64(ARCH_PNG)}" alt="the four stages of the pipeline: degrade, '
+                f'reconstruct twice, segment with one frozen network, and measure '
+                f'uncertainty"></figure>')
+    return """<div class="steps">
+      <div class="step"><div class="n">01</div><h3>Degrade</h3>
+        <p>K-space truncation and Rician noise on a real scan, so every input keeps an exact
+        reference.</p></div>
+      <div class="step"><div class="n">02</div><h3>Reconstruct</h3>
+        <p>Two U-Nets, identical in everything but the loss: pixel error, or lesion-weighted.</p></div>
+      <div class="step"><div class="n">03</div><h3>Segment</h3>
+        <p>One frozen segmentation U-Net reads every image. Only the image changes.</p></div>
+      <div class="step"><div class="n">04</div><h3>Score</h3>
+        <p>PSNR and SSIM inside the brain, Dice, and lesions erased or fabricated.</p></div>
+    </div>"""
+
+
 def _byline() -> str:
     """Names for the title slide, each with its role once ROLES is filled in.
 
@@ -270,7 +300,7 @@ PAGE = """<!doctype html>
   .vital.safe .v{{color:var(--safe)}} .vital.erased .v{{color:var(--erased)}}
   .dot{{display:inline-block; width:.5em; height:.5em; border-radius:50%; margin-right:.5em}}
 
-  /* Three bars, one per image handed to the same frozen detector: the degraded
+  /* Three bars, one per image handed to the same frozen segmenter: the degraded
      scan the pipeline starts from, then each reconstruction of it. Grey for the
      degraded input because it is the starting point rather than a model, so it
      must not look like one. */
@@ -332,6 +362,12 @@ PAGE = """<!doctype html>
   td:first-child{{color:var(--ink)}}
   tr:last-child td{{border-bottom:none}}
   .num{{text-align:right; font-variant-numeric:tabular-nums}}
+
+  /* the architecture figure, rendered by build_architecture.py so the deck and
+     that page can never disagree about what the pipeline is */
+  .arch{{margin:1.1rem 0 0; background:#fff; border:1px solid var(--border);
+    border-radius:12px; padding:.7rem}}
+  .arch img{{display:block; width:100%; height:auto}}
 
   .steps{{display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:1.2rem}}
   .steps.three{{grid-template-columns:repeat(3,1fr)}}
@@ -419,26 +455,16 @@ PAGE = """<!doctype html>
         <p>Lesion-weighted, plus a consistency term that punishes inventing tumor as well as
         losing it.</p></div>
       <div class="step"><div class="n">03</div><h3>An evaluation that holds</h3>
-        <p>Real BraTS, split by patient, one frozen detector, an untouched test split.</p></div>
+        <p>Real BraTS, split by patient, one frozen segmenter, an untouched test split.</p></div>
     </div>
     <p class="note">Corrective, not architectural: no new network, three small U-Nets.</p>
   </section>
 
   <section class="slide">
     <div class="tag"><span class="sec">04</span>Method</div>
-    <h2>Degrade a real scan, reconstruct it two ways, and ask one frozen detector what it can
-    still find.</h2>
-    <div class="steps">
-      <div class="step"><div class="n">01</div><h3>Degrade</h3>
-        <p>K-space truncation and Rician noise on a real scan, so every input keeps an exact
-        reference.</p></div>
-      <div class="step"><div class="n">02</div><h3>Reconstruct</h3>
-        <p>Two U-Nets, identical in everything but the loss: pixel error, or lesion-weighted.</p></div>
-      <div class="step"><div class="n">03</div><h3>Detect</h3>
-        <p>One frozen segmenter reads every image. Only the image changes.</p></div>
-      <div class="step"><div class="n">04</div><h3>Score</h3>
-        <p>PSNR and SSIM inside the brain, Dice, and lesions erased or fabricated.</p></div>
-    </div>
+    <h2>Degrade a real scan, reconstruct it two ways, and ask one frozen
+    segmentation network what it can still find.</h2>
+    {arch}
     <p class="note"><b>No GAN, deliberately.</b> An adversarial loss rewards inventing plausible
     tissue, which is the failure we are measuring. 17,233 slices, 468 patients (BraTS).</p>
   </section>
@@ -889,7 +915,7 @@ def _slice_blocks(device, n_slices):
 
         # Rows in the order a reader expects: the cheap scan the pipeline starts
         # from, then each reconstruction of it. Every row is scored by the same
-        # frozen detector, so the only thing changing is the image.
+        # frozen segmenter, so the only thing changing is the image.
         order = ["low-res", "distortion", "tumor-aware"]
         n_les = rows["low-res"]["lesions"]
         cells = []
@@ -963,6 +989,7 @@ def build(out: str = OUT, device: str | None = None, n_slices: int = 3):
         img_di=_b64(pngs["distortion"]), img_gif=_b64(gif),
         unc_panel=unc_panel, slices=slices,
         blindness=_blindness_block(), roles=_roles_block(), byline=_byline(),
+        arch=_arch_block(),
         size=size, factor=factor, sigma=sigma,
     )
     with open(out, "w") as f:

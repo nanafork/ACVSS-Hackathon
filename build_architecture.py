@@ -40,6 +40,19 @@ from src.palette import (FIG, LIGHT, UNCERTAINTY_RAMP, error_cmap,
                          uncertainty_cmap)
 
 OUT = "architecture.html"
+PNG_OUT = "figures/architecture.png"
+TMP_HTML = ".architecture_nocaption.html"
+
+# Where to find a headless browser for the PNG export. The deck needs the figure
+# as one image, and rendering it here rather than re-implementing the layout in
+# main_demo.py keeps a single source for the diagram.
+CHROMES = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+]
 
 # The 3D renders already in the repo root, and what each one is.
 RENDERS = [
@@ -343,7 +356,7 @@ CSS = """
   *{box-sizing:border-box}
   body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
     line-height:1.55; -webkit-font-smoothing:antialiased}
-  .wrap{max-width:1180px; margin:0 auto; padding:2.4rem 1.4rem 4rem}
+  .wrap{max-width:1180px; margin:0 auto; padding:1.6rem 1.3rem 2rem}
   h1{font-size:clamp(1.7rem,3.6vw,2.5rem); letter-spacing:-.02em; margin:.2rem 0 .3rem;
     text-wrap:balance}
   h2{font-size:1.15rem; margin:2.6rem 0 .5rem; letter-spacing:-.01em; text-wrap:balance}
@@ -578,7 +591,8 @@ def _level(no: int, title: str, hue: str, blocks: str, proc: str,
     </div>"""
 
 
-def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
+def build(out: str = OUT, device: str | None = None, pool: int = 24,
+          with_caption: bool = True) -> str:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     p, procs, rows, meta = stage_panels(device, pool)
 
@@ -652,67 +666,29 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
                 + ", ".join(f"<code>{m}</code>" for m in missing)
                 + ". Run <code>python main_demo.py</code> to regenerate them.</p>")
 
-    html = f"""<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Architecture &middot; Tumor-Aware MRI Super-Resolution</title>
-<style>{CSS}</style>
-<div class="wrap">
-  <div class="kicker">Tumor-aware MRI super-resolution</div>
-  <h1>Architecture</h1>
-  <p class="lede">Every panel below is this pipeline's own output on <b>one held-out
-  BraTS slice</b> that no model was trained on, pushed through the real trained
-  networks at build time. The models saw {meta['size']}&times;{meta['size']} slices
-  degraded by k-space truncation &times;{meta['factor']} with Rician
-  &sigma;={meta['sigma']}. Nothing here is an illustration.</p>
-
-  <h2>The pipeline</h2>
-  <div class="figure"><div class="fig-inner">
-    <div class="stack">{lv1}{sw_a}{lv2}{sw_b}{lv3}{sw_c}{lv4}</div>
+    caption = "" if not with_caption else f"""
     <figcaption><b>Figure 1.</b> One held-out patient, pulled apart left to right
     into the four stages that act on them. Each plate is a 3D volume this pipeline
     produced; the box under it is how that stage works, drawn from the code that
     does it, so the channel widths, the dropout and the truncated k-space are read
     off the modules rather than sketched. The dotted horizontals are alignment
-    guides, not flow. The two arrows merging into
-    stage 3 are the point of the study: both reconstructions are read by the same
-    frozen segmentation network, so the only thing that changes between them is
-    the image
-    handed to it.</figcaption>
+    guides, not flow. The two arrows merging into stage 3 are the point of the
+    study: both reconstructions are read by the same frozen segmentation network,
+    so the only thing that changes between them is the image handed to it.
+    </figcaption>"""
+
+    # The page is the figure and nothing else. The slice strip, the metrics table,
+    # the code table and the entry points were here and are still built above:
+    # _thumb, code_structure and ENTRY_POINTS are one f-string away if they are
+    # wanted back.
+    html = f"""<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture &middot; Tumor-Aware MRI Super-Resolution</title>
+<style>{CSS}</style>
+<div class="wrap">
+  <div class="figure"><div class="fig-inner">
+    <div class="stack">{lv1}{sw_a}{lv2}{sw_b}{lv3}{sw_c}{lv4}</div>{caption}
   </div></div>
   {note}
-
-  <h2>The same slice, stage by stage</h2>
-  <p class="small">The 2D output of each stage on the held-out slice the figure
-  above was built from. Fill is what the frozen segmentation network found, in
-  that model's
-  colour; the blue outline is the true tumor, so an outline with nothing in it is
-  an erased lesion.</p>
-  <div class="card"><div class="strip">{strip}</div></div>
-
-  <h2>What that slice scored</h2>
-  <p class="small">The same numbers the deck reports, for the single slice drawn
-  above. It carries {meta['lesions']} lesion components. PSNR and SSIM compare the
-  image to the true scan; Dice, erased and fabricated compare the segmentation
-  network's
-  output on it to the true tumor mask. One slice is an illustration, not a result:
-  the aggregate figures come from 70 held-out patients.</p>
-  <div class="scroll"><table>
-    <tr><th>image handed to the segmenter</th><th class=n>PSNR</th><th class=n>SSIM</th>
-      <th class=n>Dice</th><th class=n>erased</th><th class=n>fabricated</th></tr>
-    {slice_rows}
-  </table></div>
-
-  <h2>Code structure</h2>
-  <p class="small">Read from the modules themselves at build time: each line is the
-  first line of that module's own docstring, with its length in lines.</p>
-  <div class="scroll"><table>
-    <tr><th>module</th><th>what it is</th><th class=n>lines</th></tr>
-    {modules}
-  </table></div>
-
-  <h2>Five entry points</h2>
-  <p class="small">Data, training, verification, inference, presentation. Everything
-  else in the repository is a library these five call.</p>
-  <div class="entries">{entries}</div>
 </div>"""
 
     with open(out, "w") as f:
@@ -723,14 +699,72 @@ def build(out: str = OUT, device: str | None = None, pool: int = 24) -> str:
     return out
 
 
+def export_png(html: str, out: str, width: int = 1520, height: int = 900,
+               scale: int = 2, pad: int = 12) -> str:
+    """Render a figure-only page to a tightly cropped PNG via headless Chrome.
+
+    The deck wants the diagram as a single image. Screenshotting the page we
+    already build means the deck and this page can never disagree about what the
+    architecture is, which duplicating the markup into ``main_demo.py`` would
+    eventually allow.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    chrome = next((c for c in CHROMES if os.path.exists(c)), None) or \
+        shutil.which("chromium") or shutil.which("google-chrome")
+    if not chrome:
+        raise SystemExit("no Chrome or Chromium found for --png; set one in CHROMES")
+
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        shot = os.path.join(tmp, "shot.png")
+        subprocess.run(
+            [chrome, "--headless", "--disable-gpu", "--hide-scrollbars",
+             f"--force-device-scale-factor={scale}",
+             f"--window-size={width},{height}",
+             f"--screenshot={shot}", f"file://{os.path.abspath(html)}"],
+            check=True, capture_output=True)
+
+        from PIL import Image
+        im = Image.open(shot).convert("RGB")
+        # crop to the white figure card: everything else on the page is the
+        # background colour, so the card is the only near-white region
+        px = im.load()
+        w, h = im.size
+        xs, ys = [], []
+        for y in range(0, h, 2):
+            for x in range(0, w, 2):
+                r, g, b = px[x, y]
+                if r > 244 and g > 244 and b > 244:
+                    xs.append(x); ys.append(y)
+        if not xs:
+            raise SystemExit("could not find the figure card in the screenshot")
+        box = (max(0, min(xs) + pad), max(0, min(ys) + pad),
+               min(w, max(xs) - pad), min(h, max(ys) - pad))
+        im.crop(box).save(out)
+    print("wrote", out, Image.open(out).size)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--device", default=None)
     ap.add_argument("--pool", type=int, default=24,
                     help="how many held-out slices to score when picking one")
+    ap.add_argument("--png", metavar="PATH", nargs="?", const=PNG_OUT,
+                    help="also write the figure, without its caption, as a PNG "
+                         "for the deck (needs a local Chrome)")
     a = ap.parse_args()
     build(a.out, a.device, a.pool)
+    if a.png:
+        build(TMP_HTML, a.device, a.pool, with_caption=False)
+        try:
+            export_png(TMP_HTML, a.png)
+        finally:
+            os.remove(TMP_HTML)      # scratch, not an artifact
 
 
 if __name__ == "__main__":
