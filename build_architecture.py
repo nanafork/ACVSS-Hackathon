@@ -135,7 +135,8 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import torch.nn as nn
-    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+    from matplotlib.colors import to_rgba
+    from matplotlib.patches import FancyArrowPatch, Rectangle
 
     base = model.d1.block[0].out_channels
     chans = [base, base * 2, base * 4, base * 8]
@@ -153,17 +154,12 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
              (4, -2 * dy, chans[2]), (5, -dy, chans[1]), (6, 0, chans[0])]
 
     fig, ax = plt.subplots(figsize=inches, facecolor="white")
-    bw, bh = 0.8, 0.44
+    bw, bh = 0.62, 0.38          # square corners, tight around the label
     for x, y, c in nodes:
-        ax.add_patch(FancyBboxPatch((x - bw / 2, y - bh / 2), bw, bh,
-                                    boxstyle="round,pad=0.02,rounding_size=0.08",
-                                    linewidth=0.8, edgecolor=hue,
-                                    facecolor=hue, alpha=0.20, zorder=2))
-        ax.add_patch(FancyBboxPatch((x - bw / 2, y - bh / 2), bw, bh,
-                                    boxstyle="round,pad=0.02,rounding_size=0.08",
-                                    linewidth=0.8, edgecolor=hue,
-                                    facecolor="none", zorder=3))
-        ax.text(x, y, str(c), ha="center", va="center", fontsize=6.6,
+        ax.add_patch(Rectangle((x - bw / 2, y - bh / 2), bw, bh, linewidth=0.8,
+                               edgecolor=hue, facecolor=to_rgba(hue, 0.18),
+                               zorder=2))
+        ax.text(x, y, str(c), ha="center", va="center", fontsize=5.7,
                 color="#14161A", zorder=4)
 
     def arrow(a, b, dashed=False):
@@ -172,7 +168,7 @@ def _unet_diagram(model, hue: str, label: str, passes: int = 0,
             (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=4.5,
             linewidth=0.7, color="#14161A" if not dashed else "#8A8F96",
             linestyle=(0, (2.4, 1.8)) if dashed else "solid",
-            shrinkA=7, shrinkB=7, zorder=1))
+            shrinkA=5.5, shrinkB=5.5, zorder=1))
 
     for i in range(len(nodes) - 1):
         arrow(nodes[i][:2], nodes[i + 1][:2])
