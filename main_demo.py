@@ -613,8 +613,8 @@ PAGE = """<!doctype html>
     Anazodo et&nbsp;al. 2024.</p>
   </section>
 
-  <section class="slide">
-    <div class="tag"><span class="sec">02</span>The problem with the objective</div>
+  <section class="slide extra">
+    <div class="tag backup">The problem with the objective</div>
     <h2>A forgery with the tumor painted out scores <em>better</em> than either
     reconstruction we train.</h2>
     {blindness}
