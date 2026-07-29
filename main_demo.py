@@ -6,14 +6,32 @@ or shared with nothing alongside it.
 
     python main_demo.py            # models -> renders -> main_demo.html
 
-What is on the page, in order:
-  1. the measured safety headline (erasure rates and the tradeoff);
-  2. four 3D viewports: ground truth, tumor-aware, distortion-optimal, and the
-     MC dropout uncertainty field;
-  3. a rotating overlay of all three reconstructions on one brain;
-  4. the 2D per-slice evidence the 3D is built from: comparison panels, the
-     uncertainty and error maps, and the per-version metrics table;
-  5. how the 3D is assembled, and what the scope limits are.
+**The talk is ten slides and no more**, in the order below, one act per section
+chip, seven minutes end to end:
+
+   1 title              plus the names and roles, so the team is covered here
+   2 why this matters   MRI scarcity, and low-field as the route in
+   3 the problem        a forgery with the tumor deleted outscores our own
+                       reconstructions, measured
+   4 contribution       a safety readout, a tumor-aware objective, an
+                       evaluation that can carry the claim
+   5 method             degrade, reconstruct twice, one frozen detector, score
+   6 result             the erasure ladder
+   7 result             the same thing broken down by lesion size
+   8 result             the 3D viewports, which is the live demo
+   9 next steps         one ruler, the single test run, abstention, real data
+  10 scope              the five limits, stated before anyone has to ask
+
+Anything else carries ``class="slide extra"`` and lives on a second track,
+reached with B or the Backup button: the tradeoff dial, the rotating overlay, the
+per-slice 2D evidence, how the 3D is assembled, the detector's own floor, our own
+audit, the roles and the credits. The dots and the counter only ever count the
+ten, so material kept for questions cannot quietly lengthen the deck.
+
+Two rules when editing. Headlines are assertions, one idea each: the headline is
+the claim and the figure under it is the evidence. And a slide in the ten gets a
+headline, one piece of evidence and at most two grey footnote lines; if it wants
+a paragraph, it wants to be a backup slide. See ``DECK.md``.
 
 It supersedes the older ``demo_3d.py`` (3D only) and the unstyled ``demo.py``
 static page. ``demo.py`` stays as the source of the 2D inference helpers and
@@ -39,10 +57,126 @@ from viz_bridge import build_patient_volumes
 
 OUT = "main_demo.html"
 
+# The measured cost, in image-quality score, of deleting the tumor outright.
+# Produced by scripts/metric_blindness.py; see _blindness_block.
+BLINDNESS = "results/metric_blindness.json"
+# The validation run the headline slide quotes, read here so the quality figures
+# on the problem slide cannot drift away from the ones on the result slide.
+VAL_RUN = "results/val/val_w40_sl0.0.json"
+
+# Who did what. The brief asks that each member's role be clear, and this file
+# cannot infer it: fill a sentence in here and the roles slide renders itself.
+# Left empty, the slide still renders, with the gaps marked so they are hard to
+# forget on stage.
+ROLES = {
+    "Adiza Alhassan": "",
+    "Nthabiseng Thema": "",
+    "Albert Dodoo": "",
+    "Victor Oyindouye Miene": "",
+    "Hassan Suliman": "",
+}
+
 
 def _b64(path: str) -> str:
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
+
+
+def _blindness_block() -> str:
+    """Evidence for the slide that says the training metric cannot see a tumor.
+
+    A forgery of the true scan with the lesion painted out is scored against the
+    original, and put next to what our two reconstructions score. Numbers come
+    from ``scripts/metric_blindness.py`` (about 20 s on CPU, no model involved),
+    computed on demand if the JSON is missing so this slide is never a claim
+    with nothing under it. If the real slice cache is absent the table is
+    dropped rather than filled with phantom numbers.
+    """
+    import json
+    import os
+    import sys
+
+    blind = None
+    if os.path.exists(BLINDNESS):
+        blind = json.load(open(BLINDNESS))
+    elif os.path.exists(SLICE_CACHE):
+        sys.path.insert(0, "scripts")
+        from metric_blindness import measure
+        blind = measure(SLICE_CACHE)
+        os.makedirs(os.path.dirname(BLINDNESS), exist_ok=True)
+        with open(BLINDNESS, "w") as f:
+            json.dump(blind, f, indent=2)
+
+    if blind is None:
+        return ("<p class=\"lede\">An enhancing tumor is roughly 3% of the brain area, so a "
+                "pixel-error score barely moves when a model smooths it away. The measurement "
+                "behind this claim needs the real slice cache: run "
+                "<code>scripts/metric_blindness.py</code>.</p>")
+
+    psnr_f = blind["psnr_brain_masked"]["median"]
+    ssim_f = blind["ssim"]["median"]
+    frac = blind["lesion_fraction_of_brain"]["median"] * 100
+    n = blind["n_slices"]
+
+    # Fall back to the published validation figures if the run file is absent.
+    rec = {"distortion": (24.51, 0.778), "tumor-aware": (24.28, 0.764)}
+    if os.path.exists(VAL_RUN):
+        res = json.load(open(VAL_RUN))["results"]
+        for k in rec:
+            if k in res:
+                rec[k] = (res[k]["psnr_brain"], res[k]["ssim"])
+
+    return f"""<table style="margin-top:1.1rem; background:var(--card);
+      border:1px solid var(--border); border-radius:14px; padding:.4rem">
+      <tr><th>image scored against the true scan</th>
+        <th class=num>brain-masked PSNR</th><th class=num>SSIM</th></tr>
+      <tr><td><b>The true scan with the tumor painted out</b>
+        <span style="color:var(--ink-light)">a deliberate forgery</span></td>
+        <td class=num style="color:var(--erased)"><b>{psnr_f:.1f} dB</b></td>
+        <td class=num style="color:var(--erased)"><b>{ssim_f:.3f}</b></td></tr>
+      <tr><td>Standard super-resolution
+        <span style="color:var(--ink-light)">(baseline)</span></td>
+        <td class=num>{rec['distortion'][0]:.1f} dB</td>
+        <td class=num>{rec['distortion'][1]:.3f}</td></tr>
+      <tr><td>Tumor-aware super-resolution
+        <b style="color:var(--safe)">(ours)</b></td>
+        <td class=num>{rec['tumor-aware'][0]:.1f} dB</td>
+        <td class=num>{rec['tumor-aware'][1]:.3f}</td></tr>
+    </table>
+    <p class="note">{n:,} validation slices, lesion replaced by the median intensity of the
+    surrounding brain. It is {frac:.1f}% of the brain area, so deleting it leaves
+    <b>{psnr_f - rec['tumor-aware'][0]:.1f}&nbsp;dB of headroom over our own best
+    reconstruction</b>. Ordinary blur costs more measured error than removing the tumor.</p>
+    <p class="note"><b>So a model trained on this metric is not told to keep the tumor.</b>
+    Erasure is not a penalty, it is a rounding error.</p>"""
+
+
+def _byline() -> str:
+    """Names for the title slide, each with its role once ROLES is filled in.
+
+    The brief asks that every member's role be clear. Carrying it on the title
+    slide keeps it out of the ten slides the talk is allowed.
+    """
+    out = []
+    for name, role in ROLES.items():
+        out.append(f'{name} <span style="color:rgba(255,255,255,.36)">{role}</span>'
+                   if role else name)
+    return " &middot; ".join(out)
+
+
+def _roles_block() -> str:
+    """The roles slide. Renders whatever is in ROLES, and marks what is missing."""
+    cards = []
+    for name, role in ROLES.items():
+        body = role or '<span class="todo">role to fill in</span>'
+        cards.append(f'<div class="role"><b>{name}</b><span>{body}</span></div>')
+    return f"""  <section class="slide extra">
+    <div class="tag"><span class="sec">08</span>The team</div>
+    <h2>Who did what.</h2>
+    <div class="roles">{''.join(cards)}</div>
+    <p class="note">Every number on this deck was produced by code in this repository, and
+    every run is logged in <code>EXPERIMENTS.md</code> with its data source next to it.</p>
+  </section>"""
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -102,6 +236,7 @@ PAGE = """<!doctype html>
   h1{{font-weight:700; font-size:clamp(2.1rem,5.6vw,3.7rem); line-height:1.03;
     letter-spacing:-.02em; margin:.5rem 0 .5rem; max-width:20ch}}
   h1 em{{font-style:normal; color:var(--accent-deep)}}
+  h2 em{{font-style:normal; color:var(--accent-deep)}}
   h2{{font-weight:700; font-size:clamp(1.4rem,3vw,2rem); letter-spacing:-.01em;
     margin:.25rem 0 .5rem; max-width:34ch}}
   h3{{font-weight:600; font-size:1rem; margin:0 0 .6rem}}
@@ -135,9 +270,10 @@ PAGE = """<!doctype html>
   .vital.safe .v{{color:var(--safe)}} .vital.erased .v{{color:var(--erased)}}
   .dot{{display:inline-block; width:.5em; height:.5em; border-radius:50%; margin-right:.5em}}
 
-  /* Three bars, one per image handed to the same frozen detector: the cheap
-     scan, then each reconstruction. Grey for the low-resolution input because it
-     is the starting point rather than a model, so it must not look like one. */
+  /* Three bars, one per image handed to the same frozen detector: the degraded
+     scan the pipeline starts from, then each reconstruction of it. Grey for the
+     degraded input because it is the starting point rather than a model, so it
+     must not look like one. */
   .ladder{{margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
     border-radius:14px; padding:1.2rem 1.3rem}}
   .lrow{{display:grid; grid-template-columns:15rem 1fr 9rem; gap:1rem;
@@ -147,12 +283,9 @@ PAGE = """<!doctype html>
   .lbar{{display:flex; height:1.5rem; background:var(--card-2); border-radius:4px;
     overflow:hidden}}
   .lbar i{{display:block; height:100%}}
-  .lbar i.lowres{{background:#9BA1A6}}
-  /* 2px of surface between stacked segments so the boundary reads as a break
-     rather than a colour transition. */
-  .lbar i.add{{border-left:2px solid var(--card)}}
-  .lbar i.di{{background:var(--erased)}}
-  .lbar i.ta{{background:var(--safe)}}
+  .lbar i.deg{{background:#9BA1A6}}
+  .lbar i.base{{background:var(--erased)}}
+  .lbar i.ours{{background:var(--safe)}}
   .lnum{{font-family:var(--mono); font-size:1.05rem; text-align:right; line-height:1.2}}
   .lnum span{{display:block; font-family:var(--font); font-size:.72rem;
     color:var(--ink-light)}}
@@ -164,10 +297,6 @@ PAGE = """<!doctype html>
   .lkey{{display:flex; flex-direction:column; gap:.4rem; margin-top:1rem;
     padding-top:.9rem; border-top:1px solid var(--border);
     font-size:.78rem; color:var(--ink-mid)}}
-  .sw{{display:inline-block; width:.8rem; height:.8rem; border-radius:3px;
-    margin-right:.4rem; vertical-align:-1px}}
-  .sw.lowres{{background:#9BA1A6}} .sw.di{{background:var(--erased)}}
-  .sw.ta{{background:var(--safe); margin-left:-.15rem; margin-right:.5rem}}
   @media(max-width:760px){{.lrow{{grid-template-columns:1fr; gap:.3rem}}
     .lnum{{text-align:left}}}}
 
@@ -205,10 +334,25 @@ PAGE = """<!doctype html>
   .num{{text-align:right; font-variant-numeric:tabular-nums}}
 
   .steps{{display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:1.2rem}}
+  .steps.three{{grid-template-columns:repeat(3,1fr)}}
   .step{{background:var(--card); border:1px solid var(--border); border-radius:14px;
     padding:1.1rem}}
   .step .n{{font-family:var(--mono); font-weight:500; font-size:1.3rem; color:var(--accent)}}
+  .step h3{{font-size:.95rem; font-weight:600; margin:.3rem 0 0; color:var(--ink);
+    letter-spacing:-.01em}}
   .step p{{font-size:.82rem; color:var(--ink-mid); margin:.4rem 0 0}}
+
+  /* section chip: which act of the talk this slide belongs to */
+  .tag .sec{{font-family:var(--mono); color:var(--accent); margin-right:.5rem}}
+  .tag.backup{{color:var(--warn)}}
+
+  .roles{{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:.9rem; margin-top:1.2rem}}
+  .role{{background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:1rem 1.1rem}}
+  .role b{{display:block; font-size:.95rem}}
+  .role span{{display:block; font-size:.82rem; color:var(--ink-mid); margin-top:.25rem}}
+  .role .todo{{color:var(--warn); font-weight:600}}
 
   .scope{{background:var(--card); border:1px solid var(--border); border-radius:14px;
     padding:1.2rem 1.4rem; margin-top:1.2rem}}
@@ -234,38 +378,99 @@ PAGE = """<!doctype html>
       <p class="lede">Super-resolution makes a cheap low-field brain scan look crisp.
       Trained only for image quality, it can quietly <b>erase a small tumor</b>.
       We measure how often that happens, and fix it with a tumor-aware objective.</p>
-      <div class="byline">Adiza Alhassan &middot; Nthabiseng Thema &middot; Albert Dodoo &middot; Victor Oyindouye Miene &middot; Hassan Suliman</div>
+      <div class="byline">{byline}</div>
     </div>
   </section>
 
   <section class="slide">
-    <div class="tag">Validation result &middot; real BraTS, 70 unseen patients</div>
-    <h2>Super-resolution recovers tumor the cheap scan loses. Ours recovers more of it.</h2>
+    <div class="tag"><span class="sec">01</span>Why this matters</div>
+    <h2>Cheap, low-quality scanners are the only realistic way to widen MRI access.</h2>
     <div class="vitals">
-      <div class="vital"><div class="k"><span class="dot" style="background:#9BA1A6"></span>Low-resolution scan</div>
+      <div class="vital"><div class="k">Sub-Saharan Africa</div>
+        <div class="v" style="color:var(--erased)">&lt;1<span class="u">scanner per million</span></div>
+        <div class="d">MRI is scarce where the disease burden is not</div></div>
+      <div class="vital"><div class="k">High-income countries</div>
+        <div class="v" style="color:var(--ink-mid)">37<span class="u">per million</span></div>
+        <div class="d">up to this many, for the same imaging need</div></div>
+      <div class="vital safe"><div class="k">The route in</div>
+        <div class="v" style="color:var(--safe)">0.055<span class="u">tesla</span></div>
+        <div class="d">portable low-field scanners are deployable, and their images are
+          blurry and noisy</div></div>
+    </div>
+    <p class="note">The bottleneck moves from the scanner to the image it produces, and
+    super-resolution is the accepted bridge. Anazodo et&nbsp;al., Nature Communications 2024.</p>
+  </section>
+
+  <section class="slide">
+    <div class="tag"><span class="sec">02</span>The problem with the objective</div>
+    <h2>A forgery with the tumor painted out scores <em>better</em> than either
+    reconstruction we train.</h2>
+    {blindness}
+  </section>
+
+  <section class="slide">
+    <div class="tag"><span class="sec">03</span>Contribution</div>
+    <h2>We measure the erasure that a quality metric hides, then train against it.</h2>
+    <div class="steps three">
+      <div class="step"><div class="n">01</div><h3>A safety readout</h3>
+        <p>Lesions <b>erased</b> and <b>fabricated</b>, by lesion size, against the detector's
+        own floor.</p></div>
+      <div class="step"><div class="n">02</div><h3>A tumor-aware objective</h3>
+        <p>Lesion-weighted, plus a consistency term that punishes inventing tumor as well as
+        losing it.</p></div>
+      <div class="step"><div class="n">03</div><h3>An evaluation that holds</h3>
+        <p>Real BraTS, split by patient, one frozen detector, an untouched test split.</p></div>
+    </div>
+    <p class="note">Corrective, not architectural: no new network, three small U-Nets.</p>
+  </section>
+
+  <section class="slide">
+    <div class="tag"><span class="sec">04</span>Method</div>
+    <h2>Degrade a real scan, reconstruct it two ways, and ask one frozen detector what it can
+    still find.</h2>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><h3>Degrade</h3>
+        <p>K-space truncation and Rician noise on a real scan, so every input keeps an exact
+        reference.</p></div>
+      <div class="step"><div class="n">02</div><h3>Reconstruct</h3>
+        <p>Two U-Nets, identical in everything but the loss: pixel error, or lesion-weighted.</p></div>
+      <div class="step"><div class="n">03</div><h3>Detect</h3>
+        <p>One frozen segmenter reads every image. Only the image changes.</p></div>
+      <div class="step"><div class="n">04</div><h3>Score</h3>
+        <p>PSNR and SSIM inside the brain, Dice, and lesions erased or fabricated.</p></div>
+    </div>
+    <p class="note"><b>No GAN, deliberately.</b> An adversarial loss rewards inventing plausible
+    tissue, which is the failure we are measuring. 17,233 slices, 468 patients (BraTS).</p>
+  </section>
+
+  <section class="slide">
+    <div class="tag"><span class="sec">05</span>Result &middot; real BraTS, 70 unseen patients</div>
+    <h2>Super-resolution recovers tumor the degradation destroys. Ours recovers more of it.</h2>
+    <div class="vitals">
+      <div class="vital"><div class="k"><span class="dot" style="background:#9BA1A6"></span>The degraded scan</div>
         <div class="v" style="color:var(--ink-mid)">62.2<span class="u">%</span></div>
-        <div class="d">of enhancing lesions missed, before any super-resolution</div></div>
+        <div class="d">of enhancing lesions missed in the degraded scan, before any reconstruction</div></div>
       <div class="vital erased"><div class="k"><span class="dot" style="background:var(--erased)"></span>Standard SR <b style="color:var(--ink-mid)">(baseline)</b></div>
         <div class="v">58.0<span class="u">%</span></div>
-        <div class="d">recovers some of what the cheap scan loses</div></div>
+        <div class="d">recovers some of what the degradation destroyed</div></div>
       <div class="vital safe"><div class="k"><span class="dot" style="background:var(--safe)"></span>Tumor-aware SR <b style="color:var(--safe)">(OURS)</b></div>
         <div class="v">51.3<span class="u">%</span></div>
         <div class="d">&minus;6.7 points vs baseline, at matched quality</div></div>
     </div>
     <div class="ladder">
       <div class="lrow">
-        <div class="llab">Low-resolution scan<span>what a cheap scanner produces</span></div>
-        <div class="lbar"><i class="lowres" style="width:88.9%"></i></div>
+        <div class="llab">The degraded scan<span>a real scan we degraded to imitate a cheap scanner</span></div>
+        <div class="lbar"><i class="deg" style="width:88.9%"></i></div>
         <div class="lnum">62.2%<span>missed</span></div>
       </div>
       <div class="lrow">
         <div class="llab">Standard super-resolution <span style="display:inline;font-weight:600;color:var(--ink-mid)">(baseline)</span><span>trained only for image quality</span></div>
-        <div class="lbar"><i class="add di" style="width:82.9%"></i></div>
+        <div class="lbar"><i class="base" style="width:82.9%"></i></div>
         <div class="lnum">58.0%<span>missed</span></div>
       </div>
       <div class="lrow">
         <div class="llab">Tumor-aware super-resolution <span style="display:inline;font-weight:700;color:var(--safe)">(OURS)</span><span>our objective: lesion-weighted loss</span></div>
-        <div class="lbar"><i class="add ta" style="width:73.3%"></i></div>
+        <div class="lbar"><i class="ours" style="width:73.3%"></i></div>
         <div class="lnum">51.3%<span><b style="color:var(--safe)">&minus;6.7</b> vs baseline</span></div>
       </div>
       <div class="lscale"><div><span>0%</span>
@@ -276,32 +481,21 @@ PAGE = """<!doctype html>
       </div>
     </div>
 
-    <p class="note"><b>These are validation numbers, not the final test result.</b> Three loss
-    configurations are being compared on the validation split; the winner will be evaluated
-    once on 94 held-out test patients, and that single number is the one to quote. Reporting
-    the best of several configurations on the test set would not be an evaluation.</p>
-    <p class="note">Real brain MRI from the Medical Segmentation Decathlon (BraTS), 17,233
-    slices from 468 patients, split <b>by patient</b> so no slice of a held-out case was ever
-    trained on. The unit of analysis is the patient, not the lesion: one tumor spans many
-    slices and those outcomes move together, so pooling lesion cross-sections overstates
-    precision by about 1.5&times;. Brain-masked PSNR differs by 0.23&nbsp;dB (24.51 vs 24.28),
-    measured inside the brain because roughly a tenth of a slice is empty background that both
-    models reproduce for free and which flatters the match. The cost is hallucination, with
-    the false positive rate rising from 0.266 to 0.387.
-    True HR is the original high-resolution scan; we degrade it to imitate a cheap low-field
-    scanner.</p>
+    <p class="note">Matched quality: brain-masked PSNR 24.51 vs 24.28. The cost is
+    hallucination, 0.266 to 0.387. <b>Validation, not test</b>: the 94 test patients get one
+    evaluation, once.</p>
   </section>
 
   <section class="slide">
-    <div class="tag">Broken down by lesion size</div>
+    <div class="tag"><span class="sec">05</span>Result &middot; broken down by lesion size</div>
     <h2>Large lesions are almost never lost. Small ones are the whole problem.</h2>
-    <p class="note">Same 70 validation patients, 9,490 lesion components, split by area. Each
-    column is the share of lesions the detector could no longer find in that image.</p>
+    <p class="note">Same 70 patients, 9,490 lesion components. Each column is the share the
+    detector could no longer find.</p>
     <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
       border-radius:14px; padding:.4rem">
       <tr>
         <th>lesion size</th><th class=num>how many</th>
-        <th class=num>low-resolution<br><span style="font-weight:400;text-transform:none;letter-spacing:0">the cheap scan</span></th>
+        <th class=num>degraded scan<br><span style="font-weight:400;text-transform:none;letter-spacing:0">before reconstruction</span></th>
         <th class=num>standard SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(baseline)</span></th>
         <th class=num>tumor-aware SR<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(ours)</span></th>
       </tr>
@@ -315,22 +509,13 @@ PAGE = """<!doctype html>
         <td class=num>3.2%</td><td class=num style="color:var(--erased)">1.2%</td>
         <td class=num style="color:var(--safe)"><b>0.9%</b></td></tr>
     </table>
-    <p class="note"><b>Start with the large row.</b> A lesion over 200&nbsp;px is missed under 1%
-    of the time by either model, so substantial tumors are not being erased and a raw figure
-    near 50% should not be read as "half the tumors vanish".</p>
-    <p class="note"><b>Then the small row.</b> 71% of all components are under 50&nbsp;px, which
-    is what drags the overall rate up, and it is also where our objective helps most: 78.6% down
-    to 69.8%, against a fraction of a point on large lesions. That is the thesis exactly &mdash;
-    the objective matters where the structure is small enough for a pixel-error score to ignore
-    it.</p>
-    <p class="note">Small does not mean unimportant &mdash; a 30&nbsp;px enhancing focus can be
-    an early recurrence, and this is where the remaining work is. It is also partly an artefact:
-    a thin enhancing rim fragments into many 4-connected pieces, and this metric weights a
-    five-pixel speck the same as a whole tumor.</p>
+    <p class="note"><b>Large lesions are essentially never lost</b>, so nothing here says half
+    of all tumors vanish. The rate is driven by the small components, 71% of the count, and that
+    is where our objective helps: 78.6 to 69.8.</p>
   </section>
 
-  <section class="slide">
-    <div class="tag">A second finding</div>
+  <section class="slide extra">
+    <div class="tag"><span class="sec">05</span>Result &middot; a second finding</div>
     <h2>The erasure&ndash;hallucination tradeoff is a dial, not a fixed price.</h2>
     <p class="note">Protecting tumors costs false alarms. A loss that says "get the lesion
     region right" also rewards over-painting anything lesion-like, and that overshoot
@@ -375,8 +560,8 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
-    <div class="tag">Four viewports</div>
-    <h2>What each objective leaves behind.</h2>
+    <div class="tag"><span class="sec">05</span>Result &middot; four viewports</div>
+    <h2>The lesions the baseline loses show up in 3D as empty blue shells.</h2>
     <div class="panels">
     <figure><img src="data:image/png;base64,{img_true}" alt="ground truth tumor in 3D">
       <figcaption><b>Ground truth.</b> The true lesions, in blue.</figcaption></figure>
@@ -386,15 +571,14 @@ PAGE = """<!doctype html>
       <figcaption><b>Distortion-optimal &mdash; baseline.</b> Small lesions dropped.</figcaption></figure>
     {unc_panel}
     </div>
-    <p class="note">A blue ghost with no fill inside it is a lesion the model lost. This is
-    one held-out patient, restacked from per-slice predictions. Models were trained on
-    {size}&times;{size} slices with k-space factor {factor} and Rician &sigma;={sigma}; the
-    volume here is rendered at full head width so the surface closes.</p>
+    <p class="note">A blue shell with nothing inside it is a lesion the model lost. One
+    held-out patient, {size}&times;{size} slices, k-space factor {factor}, Rician
+    &sigma;={sigma}.</p>
   </section>
 
-  <section class="slide">
-    <div class="tag">One brain, three reconstructions</div>
-    <h2>Where each objective keeps or loses tissue.</h2>
+  <section class="slide extra">
+    <div class="tag"><span class="sec">05</span>Result &middot; one brain, three reconstructions</div>
+    <h2>A rotating overlay lets you check the claim by eye. It is not how we measure it.</h2>
     <div class="rotate">
       <div class="view"><img src="data:image/gif;base64,{img_gif}" alt="rotating 3D brain with tumor overlays"></div>
       <div>
@@ -413,9 +597,9 @@ PAGE = """<!doctype html>
 
   {slices}
 
-  <section class="slide">
-    <div class="tag">How the 3D is built</div>
-    <h2>From a 2D model to a 3D readout.</h2>
+  <section class="slide extra">
+    <div class="tag"><span class="sec">04</span>Method &middot; how the 3D readout is built</div>
+    <h2>The 3D volumes are restacked 2D predictions, not the output of a 3D model.</h2>
     <div class="steps">
       <div class="step"><div class="n">01</div><p>A real held-out BraTS case the models never saw during training.</p></div>
       <div class="step"><div class="n">02</div><p>Each axial slice is degraded, super-resolved by both models, then segmented.</p></div>
@@ -429,49 +613,118 @@ PAGE = """<!doctype html>
   </section>
 
   <section class="slide">
-    <div class="tag">What this is not</div>
-    <h2>Scope, stated plainly.</h2>
-    <div class="scope"><ul>
-      <li><b>It only works on small lesions.</b> Repeating the identical pipeline on whole
-          tumor (10.9% of the image, against 3.5% for enhancing tumor) shows no benefit at
-          all: 64.6% vs 63.7% erasure. That is what the theory predicts. The objective is
-          only misaligned when erasing the structure costs negligible PSNR, so there is
-          nothing to fix for a large region.</li>
-      <li><b>Enhancement can make detection worse.</b> On whole tumor, both SR models erase
-          more than the raw low-res input (64.6% and 63.7% vs 61.5%) while improving PSNR by
-          3&nbsp;dB. Better image quality, worse finding.</li>
-      <li><b>Simulated degradation.</b> It reproduces resolution loss and noise, but not the
-          contrast change of a genuinely low-field scanner. We degrade real high-field scans;
-          we have not tested a real low-field acquisition.</li>
-      <li><b>The fix costs hallucination.</b> False positive rate rises from 0.266 to 0.387.
-          Which error a clinic can tolerate is a clinical decision, not ours.</li>
-      <li><b>Numbers on this deck are validation, not test.</b> The final figure comes from
-          one evaluation of one configuration on 94 patients never used for any decision.</li>
-      <li><b>The tumor detector is the weakest link, not the enhancement.</b> It misses a
-          large share of small enhancing components even on an untouched scan, so a stronger
-          downstream model would buy more than a better loss function would.</li>
-      <li><b>Lesion components fragment.</b> An enhancing rim breaks into many small
-          4-connected pieces, so component counts run high and each counts equally. That
-          inflates absolute rates.</li>
-      <li><b>Uncertainty is a reliability signal, not a tumor detector.</b> It runs about
-          1.5&times; higher inside the lesion than in healthy tissue here, which is
-          suggestive rather than diagnostic.</li>
-      <li><b>Do not read cm&sup3; off a render.</b> The segmenter over-reads even a clean
-          high-resolution scan, so compare a reconstruction against the segmenter's own
-          reading of the true scan, never against the true mask.</li>
-    </ul></div>
+    <div class="tag"><span class="sec">06</span>Next steps</div>
+    <h2>The next number we produce is the one that counts: one test evaluation, 94 patients,
+    once.</h2>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><h3>One ruler</h3>
+        <p>All three objectives against a single frozen segmenter. Written, needs a GPU box.</p></div>
+      <div class="step"><div class="n">02</div><h3>The test run</h3>
+        <p>One evaluation, one configuration, 94 untouched patients. That is the number we will
+        stand behind.</p></div>
+      <div class="step"><div class="n">03</div><h3>Abstain, do not guess</h3>
+        <p>Flag where MC-dropout variance is high instead of returning a confidently crisp
+        image. AUROC 0.85, no GPU needed.</p></div>
+      <div class="step"><div class="n">04</div><h3>A real cheap scan</h3>
+        <p>Low-field acquisition or BraTS-Africa. Ours simulates resolution loss, not low-field
+        contrast.</p></div>
+    </div>
   </section>
 
   <section class="slide">
+    <div class="tag"><span class="sec">07</span>What this is not</div>
+    <h2>Five limits we would rather state than be asked.</h2>
+    <div class="scope"><ul>
+      <li><b>Only small lesions.</b> On whole tumor, 10.9% of the image, the same pipeline
+          shows no benefit at all: 64.6% vs 63.7%. Exactly what the theory predicts.</li>
+      <li><b>Enhancement can make detection worse.</b> On whole tumor both models erase more
+          than the raw low-res input, while gaining 3&nbsp;dB.</li>
+      <li><b>Simulated degradation.</b> Resolution loss and noise, not low-field contrast.</li>
+      <li><b>The fix costs hallucination.</b> 0.266 to 0.387. Which error a clinic tolerates is
+          a clinical decision.</li>
+      <li><b>Validation, not test.</b> One evaluation on 94 untouched patients is still to
+          come.</li>
+    </ul></div>
+    <p class="note">The detector's own floor, our audit, the tradeoff dial and the per-slice
+    evidence are on the backup slides. Press <b>B</b>.</p>
+  </section>
+
+  {roles}
+
+  <section class="slide extra">
     <div class="tag">Credits</div>
     <h2>Reproducing this.</h2>
     <p class="credits">3D rendering by the vendored
     <a href="https://github.com/asmarufoglu/neuro-voxel">neuro-voxel</a> analyzer
-    (PyVista and VTK marching cubes). Every volume shown is our own model output on a
-    synthetic phantom, which makes this a proof of concept rather than a clinical result.
+    (PyVista and VTK marching cubes). Every volume shown is our own model output on a real
+    held-out BraTS case, degraded by our own forward model, which makes this a proof of concept
+    on simulated low-field degradation rather than a clinical result.
     Colors are validated for colorblind separability in <code>src/palette.py</code>.
     Regenerate the whole deck with <code>python main_demo.py</code>. See
-    <code>README.md</code> for the full safety study and <code>paper/</code> for the write-up.</p>
+    <code>README.md</code> for the study, <code>EXPERIMENTS.md</code> for every run and the
+    audit behind these numbers, and <code>paper/</code> for the write-up.</p>
+  </section>
+
+  <section class="slide extra">
+    <div class="tag backup">Backup &middot; the denominator</div>
+    <h2>The detector misses most small lesions even on an untouched scan.</h2>
+    <p class="note">The frozen segmenter run on the <b>original high-resolution scan</b> &mdash;
+    no degradation, no reconstruction &mdash; on the same 70 validation patients. This is the
+    floor that any absolute erasure rate sits on top of.</p>
+    <table style="margin-top:1.1rem; background:var(--card); border:1px solid var(--border);
+      border-radius:14px; padding:.4rem">
+      <tr><th>lesion size</th><th class=num>how many</th>
+        <th class=num>missed on the<br>untouched scan</th>
+        <th class=num>baseline adds</th><th class=num>ours adds</th></tr>
+      <tr><td><b>small</b> &lt;50&nbsp;px</td><td class=num>6,762 <span style="color:var(--ink-light)">(71%)</span></td>
+        <td class=num>65.1%</td><td class=num style="color:var(--erased)">+13.5</td>
+        <td class=num style="color:var(--safe)"><b>+4.7</b></td></tr>
+      <tr><td><b>medium</b> 50&ndash;200&nbsp;px</td><td class=num>1,005</td>
+        <td class=num>10.0%</td><td class=num style="color:var(--erased)">+6.4</td>
+        <td class=num style="color:var(--safe)"><b>+3.5</b></td></tr>
+      <tr><td><b>large</b> &gt;200&nbsp;px</td><td class=num>1,723</td>
+        <td class=num>0.5%</td><td class=num style="color:var(--erased)">+0.7</td>
+        <td class=num style="color:var(--safe)"><b>+0.4</b></td></tr>
+      <tr><td><b>overall</b></td><td class=num>9,490</td>
+        <td class=num><b>45.5%</b></td><td class=num style="color:var(--erased)">+9.1</td>
+        <td class=num style="color:var(--safe)"><b>+2.6</b></td></tr>
+    </table>
+    <p class="note"><b>Read the last two columns, not the first.</b> A raw rate near 50% is
+    mostly this floor rather than damage done by super-resolution. The part attributable to the
+    pipeline is the excess, and our objective removes about <b>71% of it</b> overall. It also
+    means the honest priority is a stronger detector: it is the weakest link, not the
+    enhancement. And it is why cm&sup3; must never be read off a render &mdash; the segmenter
+    over-reads even a clean scan, so a reconstruction is only ever compared against the
+    segmenter's own reading of the true scan.</p>
+  </section>
+
+  <section class="slide extra">
+    <div class="tag backup">Backup &middot; our own audit</div>
+    <h2>Two flaws in our own pipeline cut our first headline in half.</h2>
+    <div class="scope"><ul>
+      <li><b>A dropout leak.</b> The Monte Carlo uncertainty pass switched dropout on and never
+          restored eval mode, so every slice after the first was super-resolved
+          <i>stochastically</i>. Every safety number the evaluation had ever produced was scored
+          on noise. After the fix the erasure gap fell from 5.5 points to <b>2.4</b>.</li>
+      <li><b>Lesions counted per slice, not per patient.</b> One tumor spans twenty axial
+          slices and those outcomes move together, so pooling cross-sections inflated our
+          effective sample size. Recomputed with the patient as the unit: <b>+3.2 points, 95%
+          CI [0.7, 6.9], p&nbsp;=&nbsp;0.007</b>, and 11 of 71 patients got <i>worse</i>. The
+          earlier "roughly 5 sigma" claim was wrong.</li>
+      <li><b>An earlier headline retired entirely.</b> "The baseline erases the tumor
+          completely, 0.00&nbsp;cm&sup3;" came from an undertrained checkpoint. Properly
+          trained, both models over-segment. The claim is gone and the cm&sup3; figure is now
+          labelled an illustration.</li>
+      <li><b>Uncertainty is a reliability signal, not a tumor detector.</b> It runs about
+          1.5&times; higher inside the lesion than in healthy tissue, which is suggestive
+          rather than diagnostic.</li>
+      <li><b>Lesion components fragment.</b> An enhancing rim breaks into many small
+          4-connected pieces, so component counts run high and a five-pixel speck counts the
+          same as a whole tumor. That inflates absolute rates in both directions.</li>
+    </ul></div>
+    <p class="note">Every run, its data source and what it actually showed are in
+    <code>EXPERIMENTS.md</code>, which is append-only. The point of that file is that a number
+    on a slide can be traced back to a checkpoint and a command.</p>
   </section>
 
 </div>
@@ -480,52 +733,83 @@ PAGE = """<!doctype html>
   <div class="inner">
     <button class="btn" id="prev" aria-label="previous slide">&larr; Prev</button>
     <button class="btn primary" id="next" aria-label="next slide">Next &rarr;</button>
+    <button class="btn" id="mode" aria-label="show backup slides">Backup</button>
     <div class="dots" id="dots"></div>
-    <span class="hint">&larr; &rarr; or space</span>
+    <span class="hint">&larr; &rarr; or space &middot; B for backup</span>
     <span class="counter" id="counter"></span>
   </div>
 </nav>
 
 <script>
 (function () {{
-  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  /* Two tracks. The talk is the ten slides without .extra, and the dots, the
+     counter and the arrow keys only ever move through those. The backups sit on
+     a second track reached with B or the Backup button, so material kept for
+     questions cannot lengthen the deck. */
+  var main = Array.prototype.slice.call(document.querySelectorAll('.slide:not(.extra)'));
+  var extra = Array.prototype.slice.call(document.querySelectorAll('.slide.extra'));
   var dots = document.getElementById('dots');
   var prev = document.getElementById('prev');
   var next = document.getElementById('next');
+  var mode = document.getElementById('mode');
   var counter = document.getElementById('counter');
-  var at = 0;
+  var backup = false;
+  var at = 0;      /* index in the talk */
+  var atx = 0;     /* index in the backups */
 
-  slides.forEach(function (_, i) {{
+  main.forEach(function (_, i) {{
     var b = document.createElement('button');
     b.className = 'dot-nav';
     b.setAttribute('aria-label', 'go to slide ' + (i + 1));
-    b.addEventListener('click', function () {{ go(i); }});
+    b.addEventListener('click', function () {{ backup = false; go(i); }});
     dots.appendChild(b);
   }});
 
-  function go(i) {{
-    at = Math.max(0, Math.min(slides.length - 1, i));
-    slides.forEach(function (s, j) {{ s.classList.toggle('on', j === at); }});
+  function paint() {{
+    var list = backup ? extra : main;
+    var i = backup ? atx : at;
+    main.concat(extra).forEach(function (s) {{ s.classList.remove('on'); }});
+    if (list[i]) list[i].classList.add('on');
     Array.prototype.forEach.call(dots.children, function (d, j) {{
-      d.classList.toggle('on', j === at);
+      d.classList.toggle('on', !backup && j === at);
     }});
-    prev.disabled = at === 0;
-    next.disabled = at === slides.length - 1;
-    counter.textContent = (at + 1) + ' / ' + slides.length;
+    prev.disabled = i === 0;
+    next.disabled = i === list.length - 1;
+    counter.textContent = (backup ? 'backup ' : '') + (i + 1) + ' / ' + list.length;
+    mode.classList.toggle('primary', backup);
+    mode.textContent = backup ? 'Back to talk' : 'Backup';
     window.scrollTo({{ top: 0, behavior: 'instant' }});
-    location.hash = 'p' + (at + 1);
+    location.hash = (backup ? 'b' : 'p') + (i + 1);
   }}
 
-  prev.addEventListener('click', function () {{ go(at - 1); }});
-  next.addEventListener('click', function () {{ go(at + 1); }});
+  function go(i) {{
+    var n = (backup ? extra : main).length;
+    i = Math.max(0, Math.min(n - 1, i));
+    if (backup) {{ atx = i; }} else {{ at = i; }}
+    paint();
+  }}
+
+  function toggle() {{
+    if (!extra.length) return;
+    backup = !backup;
+    paint();
+  }}
+
+  prev.addEventListener('click', function () {{ go((backup ? atx : at) - 1); }});
+  next.addEventListener('click', function () {{ go((backup ? atx : at) + 1); }});
+  mode.addEventListener('click', toggle);
   document.addEventListener('keydown', function (e) {{
-    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {{ e.preventDefault(); go(at + 1); }}
-    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {{ e.preventDefault(); go(at - 1); }}
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {{ e.preventDefault(); go((backup ? atx : at) + 1); }}
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {{ e.preventDefault(); go((backup ? atx : at) - 1); }}
+    if (e.key === 'b' || e.key === 'B') {{ toggle(); }}
+    if (e.key === 'Escape' && backup) {{ toggle(); }}
     if (e.key === 'Home') {{ go(0); }}
-    if (e.key === 'End') {{ go(slides.length - 1); }}
+    if (e.key === 'End') {{ go((backup ? extra : main).length - 1); }}
   }});
 
-  var start = parseInt((location.hash || '').replace('#p', ''), 10);
+  var h = location.hash || '';
+  backup = h.charAt(1) === 'b';
+  var start = parseInt(h.replace(/^#[pb]/, ''), 10);
   go(isNaN(start) ? 0 : start - 1);
 }})();
 </script>
@@ -615,7 +899,7 @@ def _slice_blocks(device, n_slices):
                 continue
             tags = {"distortion": " <span style='color:var(--ink-light)'>(baseline)</span>",
                     "tumor-aware": " <b style='color:var(--safe)'>(ours)</b>",
-                    "low-res": " <span style='color:var(--ink-light)'>(the cheap scan)</span>"}
+                    "low-res": " <span style='color:var(--ink-light)'>(the degraded scan)</span>"}
             cells.append(
                 f"<tr><td>{k}{tags.get(k, '')}</td><td class=num>{v['psnr']:.1f}</td>"
                 f"<td class=num>{v['ssim']:.3f}</td>"
@@ -624,8 +908,8 @@ def _slice_blocks(device, n_slices):
                 f"<td class=num>{v['fabricated']}</td></tr>")
         body = "".join(cells)
         blocks.append(f"""
-      <section class="slide">
-        <div class="tag">2D evidence &middot; {n} of {len(picks)}</div>
+      <section class="slide extra">
+        <div class="tag"><span class="sec">05</span>Result &middot; 2D evidence {n} of {len(picks)}</div>
         <h2>{verdict}</h2>
         <p class="note">Top row: the image at each stage. Bottom row: what the frozen
         segmenter finds, filled in that model's color, with the true tumor outlined.
@@ -678,6 +962,7 @@ def build(out: str = OUT, device: str | None = None, n_slices: int = 3):
         img_true=_b64(pngs["true"]), img_ta=_b64(pngs["tumor-aware"]),
         img_di=_b64(pngs["distortion"]), img_gif=_b64(gif),
         unc_panel=unc_panel, slices=slices,
+        blindness=_blindness_block(), roles=_roles_block(), byline=_byline(),
         size=size, factor=factor, sigma=sigma,
     )
     with open(out, "w") as f:

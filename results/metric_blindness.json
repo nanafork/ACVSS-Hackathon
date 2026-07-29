@@ -1,0 +1,30 @@
+{
+  "what": "true HR slice with the enhancing lesion painted out, scored against the untouched true HR slice",
+  "data": "data/slices_et_full.npz",
+  "split": "val",
+  "n_slices": 2650,
+  "psnr_whole_image": {
+    "mean": 30.848809782810495,
+    "median": 29.828300432229568,
+    "p10": 22.52985394791228,
+    "p90": 41.154627536299266
+  },
+  "psnr_brain_masked": {
+    "mean": 29.801162739224488,
+    "median": 28.81082759726567,
+    "p10": 21.72682981594954,
+    "p90": 39.913559677822
+  },
+  "ssim": {
+    "mean": 0.9681595455700497,
+    "median": 0.9775748550891876,
+    "p10": 0.9238218784332275,
+    "p90": 0.9959356307983398
+  },
+  "lesion_fraction_of_brain": {
+    "mean": 0.03536504828203119,
+    "median": 0.028300945628512406,
+    "p10": 0.004061619046357918,
+    "p90": 0.07767348794628458
+  }
+}

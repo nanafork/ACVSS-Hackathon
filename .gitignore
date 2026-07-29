@@ -29,3 +29,7 @@ data/msd/
 # sweep checkpoints live on HF (douyeszn/tumor-aware-sr); fetch, do not commit
 checkpoints/ck_*.pt
 checkpoints/sh_*.pt
+
+# presentation source material: kept locally, too large or too incidental to track
+EAI Capstone - Presentation Skills.pptx
+advice from the hosts.JPG

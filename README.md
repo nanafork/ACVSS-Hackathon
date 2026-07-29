@@ -25,6 +25,7 @@ src/
   evaluate.py     end-to-end comparison + summary table
   train.py        training loops
   figures.py      comparison panel and uncertainty figure
+scripts/metric_blindness.py  what deleting the whole tumor costs in PSNR/SSIM
 smoke_test.py     end-to-end run on synthetic data (CPU, no download)
 notebooks/tumor_aware_sr.ipynb   Kaggle orchestration (real BraTS or synthetic)
 scripts/make_notebook.py         regenerates the notebook
@@ -48,8 +49,13 @@ python main_demo.py                 # writes main_demo.html (self-contained, ope
 python demo.py --gradio             # interactive app (needs: pip install gradio)
 ```
 
-`main_demo.html` is the page we present. It carries the measured safety
-headline, four 3D viewports (ground truth, tumor-aware, distortion-optimal, and
+`main_demo.html` is the page we present, and [DECK.md](DECK.md) is how to
+present it: the 7 minute running order with timings, what to say on the slides
+that are hard to improvise, the speaker split, and the questions to have answers
+ready for. Slide headlines are assertions and the figure under each one is its
+evidence; keep it that way when editing `main_demo.py`.
+
+The page carries the measured safety headline, four 3D viewports (ground truth, tumor-aware, distortion-optimal, and
 the MC dropout uncertainty field), a rotating overlay, and the 2D evidence
 underneath it: per-slice low-res / distortion / tumor-aware / true panels, the
 predicted tumor masks (blue outline = true tumor), the uncertainty and error
